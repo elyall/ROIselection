@@ -105,6 +105,7 @@ gd.Internal.Settings.NeuropilDistance = 5;
 
 %% Configure Image settings
 gd.Internal.Images.defaultComputations = {'Raw'};
+gd.state.UIstate = 'base';
 
 %% Configure ROI settings
 gd.Internal.ROIs.n = 0;
@@ -136,6 +137,9 @@ gd.fig = figure(...
     'Position',             gd.config.Figure.pos,...
     'KeyPressFcn',          @(hObject,eventdata)KeyPressCallback(hObject,eventdata,guidata(hObject)));
 
+% gd.Internal.zoom = zoom;
+% gd.Internal.zoom.ButtonDownFilter = @KeyPressCallback;
+    
 % IMAGE LOADING
 % panel
 gd.LoadImages.panel = uipanel(...
@@ -678,6 +682,14 @@ end
 %% KEYPRESS CALLBACKS
 function KeyPressCallback(hObject,eventData,gd)
 
+% if strcmp(gd.state.UIstate, 'zoom')
+%     zoom off
+%     gd.state.UIstate = 'ready';
+% elseif strcmp(gd.state.UIstate, 'pan')
+%     pan off
+%     gd.state.UIstate = 'ready';
+% end
+
 % Pre Data Loaded
 if gd.state.dataAvailable==false %nothing loaded
     switch eventData.Key
@@ -748,6 +760,20 @@ else % Post Data Loaded
                         gd.LoadExperiment.MC.Value = abs(gd.LoadExperiment.MC.Value-1);
                         plotmainaxes([],[],gd);
                     end
+                case 'z'
+                    if ~isempty(eventData.Modifier) && strcmp(eventData.Modifier, 'shift')
+                        gd.View.axes.XLim = [0,gd.Images.Width+0.5];
+                        gd.View.axes.YLim = [0,gd.Images.Height+0.5];
+                    else
+%                         gd.Internal.zoom.Enable = 'on';
+%                         gd.state.UIstate = 'zoom';
+
+                    end
+%                     guidata(hObject, gd);
+%                 case 'p'
+%                     pan on
+%                     gd.state.UIstate = 'pan';
+%                     guidata(hObject, gd);
             end %switch E.Key, state='ready'
             
         case 'ROIedit' %ROI being edited or added
@@ -1112,6 +1138,7 @@ for c = 1:numel(gd.state.channels)
 end
 
 % Display Image
+currentZoom = [gd.View.axes.XLim; gd.View.axes.YLim];
 axes(gd.View.axes); % display on main axes
 % if numel(gd.state.channels) == 1 || all(gd.state.channels == [1, 0])
 %     colormap(gd.state.(Computation).colormap(1).current);
@@ -1128,6 +1155,8 @@ axes(gd.View.axes); % display on main axes
 set(gd.state.imghandle, 'ButtonDownFcn', @(hObject,eventdata)ROIClickCallback(hObject,eventdata,guidata(hObject)));
 % axis square;
 set(gca,'xtick',[],'ytick',[])
+gd.View.axes.XLim = currentZoom(1,:);
+gd.View.axes.YLim = currentZoom(2,:);
 
 % Display ROIs
 if gd.Internal.ROIs.n && get(gd.ROI.show, 'Value')
@@ -1467,6 +1496,8 @@ gd.state.currentDepth = 1;
 guidata(hObject,gd); % update guidata
 
 % Update GUI
+gd.View.axes.XLim = [0,gd.Images.Width+0.5];
+gd.View.axes.YLim = [0,gd.Images.Height+0.5];
 exceptions = {'FrameIndex'};
 string = sprintf('%s\n', gd.Images.filenames{1});
 set(gd.LoadImages.info,...
@@ -1516,7 +1547,7 @@ if ~ischar(eventdata)
     else
         directory = cd;
     end
-    [ExperimentFile, p] = uigetfile({'*.mat;*.ciexp'},'Choose Experiment file',directory);
+    [ExperimentFile, p] = uigetfile({'*.mat;*.exp'},'Choose Experiment file',directory);
     if isnumeric(ExperimentFile)
         return
     end
@@ -1734,7 +1765,7 @@ close(vidObj);
 function LoadROIs(hObject,eventdata,gd)
 
 % Select file
-[ROIFile,p]=uigetfile({'*.mat','MAT file (*.mat)'},...
+[ROIFile,p]=uigetfile({'*.rois;*.mat'},...
     'Choose ROI file to load',gd.Internal.directory);
 if isnumeric(ROIFile) % user hit cancel
     return
@@ -1742,7 +1773,7 @@ end
 gd.ROIs.filename = fullfile(p, ROIFile);
 
 % Load ROI Data
-load(gd.ROIs.filename, 'ROIdata');
+load(gd.ROIs.filename, 'ROIdata', '-mat');
 
 % Check if ROIs came from current file
 if gd.state.dataAvailable && isfield(ROIdata, 'imagefiles')
@@ -1800,7 +1831,7 @@ plotmainaxes([],[],gd); % Display current image with ROIs overlayed
 
 function SaveROIs(hObject,eventdata,gd)
 [~,f,~]=fileparts(gd.Images.filenames{1});
-[f,p] = uiputfile('*.mat','Save ROI file as',sprintf('%s_rois',fullfile(gd.Internal.directory,f)));
+[f,p] = uiputfile({'*.rois';'*.mat'},'Save ROI file as',sprintf('%s',fullfile(gd.Internal.directory,f)));
 if f==0
     return
 end
@@ -1834,7 +1865,7 @@ drawnow
 if exist(fullfile(p,f), 'file')
     save(fullfile(p,f),VariablesToSave{:},'-append','-mat');
 else
-    save(fullfile(p,f),VariablesToSave{:},'-mat');
+    save(fullfile(p,f),VariablesToSave{:},'-mat', '-v7.3');
 end
 set(gcf, 'pointer', 'arrow')
 fprintf('ROIs saved to: %s \n', fullfile(p,f));
