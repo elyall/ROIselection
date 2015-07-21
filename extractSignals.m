@@ -1,4 +1,4 @@
-function [ROIdata, Data, Neuropil, ROIid] = extractSignals2(Images, ROIdata, ROIid, varargin)
+function [ROIdata, Data, Neuropil, ROIid] = extractSignals(Images, ROIdata, ROIid, varargin)
 % [ROIdata, Data, Neuropil] = extractSignals2(Images, ROIdata, ROIid, varargin)
 % INPUTS:
 % Images - images or filename(s) (cell array of strings or string)
@@ -25,6 +25,9 @@ saveFile = ''; % filename to save ROIdata output to (defaults to ROIFile if one 
 MotionCorrect = false; % false, filename to load MCdata from, or true to prompt for file selection
 FrameIndex = [1, inf]; % vector of frame indices
 
+% Memory settings
+portionOfMemory = 0.08; % find 10% or less works best
+sizeRAM = 32000000000; % amount of memory on your computer (UNIX-only)
 
 %% Check input arguments
 index = 1;
@@ -72,7 +75,7 @@ end
 
 if ~exist('ROIdata', 'var') || isempty(ROIdata)
     directory = CanalSettings('DataDirectory');
-    [ROIdata,p] = uigetfile({'*.mat'},'Select ROI file:',directory);
+    [ROIdata,p] = uigetfile({'*.rois;*.mat'},'Select ROI file:',directory);
     if isnumeric(ROIdata)
         return
     end
@@ -122,10 +125,14 @@ if iscellstr(Images) % filename input
             numFramesPerLoad = loadObj.Frames;
         case 'Direct'
             [Images, loadObj] = load2P(ImageFiles, 'Type', 'Direct', 'Frames', 2, 'Double');
-            mem = memory;
             sizeFrame = whos('Images');
             sizeFrame = sizeFrame.bytes;
-            numFramesPerLoad = max(1, floor(0.1*mem.MaxPossibleArrayBytes/sizeFrame));
+            if ispc
+                mem = memory;
+                numFramesPerLoad = max(1, floor(portionOfMemory*mem.MaxPossibleArrayBytes/sizeFrame));
+            else
+                numFramesPerLoad = max(1, floor(portionOfMemory*sizeRAM/sizeFrame));
+            end
     end
     Height = loadObj.Height;
     Width = loadObj.Width;
@@ -246,9 +253,13 @@ for rindex = 1:numROIs
 end
 
 if saveOut
-    save(saveFile, 'ROIdata', '-append');
+    if ~exist(saveFile, 'file')
+        save(saveFile, 'ROIdata', '-mat', '-v7.3');
+    else
+        save(saveFile, 'ROIdata', '-mat', '-append');
+    end
     if exist('ImageFiles', 'var')
-        save(saveFile, 'ImageFiles', '-append');
+        save(saveFile, 'ImageFiles', '-mat', '-append');
     end
     fprintf('\nROIdata saved to: %s', saveFile);
 end
