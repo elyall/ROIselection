@@ -29,7 +29,7 @@ FrameIndex = [1, inf]; % vector of frame indices
 portionOfMemory = 0.08; % find 10% or less works best
 sizeRAM = 32000000000; % amount of memory on your computer (UNIX-only)
 
-%% Check input arguments
+%% Parse input arguments
 index = 1;
 while index<=length(varargin)
     switch varargin{index}
@@ -94,7 +94,7 @@ if isequal(MotionCorrect, true) % prompt for file selection
     end
 end
 
-
+tic
 %% Load in Data and determine dimensions
 
 % ROIs
@@ -200,14 +200,13 @@ Data = nan(numROIs, numFrames);
 Neuropil = nan(numROIs, numFrames);
 
 % Cycle through frames computing average fluorescence
-fprintf('Extracting signals from %d frames: %s', numFrames, ROIFile)
+fprintf('Extracting signals from %d frames for %d ROIs: %s\n', numFrames, numROIs, ROIFile)
 for bindex = 1:numFramesPerLoad:totalFrames % direct loading only -> load frames in batches
     lastframe = min(bindex+numFramesPerLoad-1, totalFrames);
     currentFrames = FrameIndex(bindex:lastframe);
     
     % direct loading only -> load current batch
     if strcmp(loadType, 'Direct')
-        fprintf('\n');
         [Images, loadObj] = load2P(ImageFiles, 'Type', 'Direct', 'Frames', currentFrames); %direct
     end
     
@@ -251,7 +250,9 @@ for rindex = 1:numROIs
         ROIdata.rois(ROIid(rindex)).rawneuropil(FrameIndex) = Neuropil(rindex, FrameIndex);
     end
 end
+fprintf('\nFinished extracting signals from %d frames for %d ROIs in %.1f minutes\n', numFrames, numROIs, ROIFile, toc/60)
 
+%% Save data to file
 if saveOut
     if ~exist(saveFile, 'file')
         save(saveFile, 'ROIdata', '-mat', '-v7.3');
@@ -261,5 +262,5 @@ if saveOut
     if exist('ImageFiles', 'var')
         save(saveFile, 'ImageFiles', '-mat', '-append');
     end
-    fprintf('\nROIdata saved to: %s', saveFile);
+    fprintf('ROIdata saved to: %s\n', saveFile);
 end
