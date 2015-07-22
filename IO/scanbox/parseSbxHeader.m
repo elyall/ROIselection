@@ -53,7 +53,11 @@ config.header = {info};
 % Save frame dimensions
 config.Height = info.recordsPerBuffer;
 if isfield(info,'scanbox_version') && info.scanbox_version >= 2
-    config.Width = info.sz(2);
+    try
+        config.Width = info.sz(2);
+    catch
+        config.Width = 796;
+    end
 else
     info.scanbox_version = 1;
     info.Width = info.postTriggerSamples;
@@ -77,12 +81,20 @@ config.Frames =  d.bytes/(config.Height*config.Width*config.Channels*2); % "2" b
 config.ZoomFactor = info.config.magnification;
 
 % Determine frame rate
-if info.scanmode == 1
-    config.FrameRate = 15.45; % dependent upon mirror speed
+if info.scanbox_version>=2
+    try
+        if info.scanmode == 1
+            config.FrameRate = 15.45; % dependent upon mirror speed
+        else
+            config.FrameRate = 30;
+        end
+    catch
+        config.FrameRate = 15.45;
+    end
 else
-    config.FrameRate = 30;
+    config.FrameRate = 15.45;
 end
-    
+            
 %% DEFAULTS
 % config.Processing = {};
 % config.info = [];

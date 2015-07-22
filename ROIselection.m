@@ -1387,7 +1387,7 @@ if iscell(eventdata) % arguments specified in function call
     
     Files = eventdata{1};
     gd.Images.loadType = eventdata{2};
-    Frames = eventdata{3};
+%     Frames = eventdata{3};
     CHannels = eventdata{4};
     
 else % gui button pressed

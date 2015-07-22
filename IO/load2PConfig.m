@@ -1,10 +1,10 @@
 function Config = load2PConfig(DataFiles)
 
+directory = cd;
 
 %% Check input arguments
 narginchk(0,1);
 if ~exist('DataFiles', 'var') || isempty(DataFiles)
-    directory = CanalSettings('DataDirectory');
     [DataFiles,p] = uigetfile({'*.sbx;*.tif;*.imgs'}, 'Choose images file(s) to load', directory, 'MultiSelect', 'on');
     if isnumeric(DataFiles)
         Images = []; return
