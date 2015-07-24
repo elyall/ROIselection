@@ -78,6 +78,8 @@ end
 
 if ischar(Frames) && strcmp(Frames, 'all')
     Frames = [1 inf];
+elseif isnumeric(Frames) && isvector(Frames) && size(Frames,1)~=1
+    Frames = Frames';
 end
 
 if ~exist('loadObj', 'var')
