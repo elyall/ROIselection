@@ -17,20 +17,22 @@ function ROIselection(ImageFile, ExperimentFile, ROIFile, varargin)
 %
 %   HotKeys:
 %       Base State
-%           Add ROI         - 'r'
-%           Edit ROI        - 'e'
-%           Next Frame      - 'd' or right arrow
-%           Last Frame      - 'a' or left arrow
-%           Play/Pause      - spacebar or 'enter'
+%           Add ROI                     - 'r'
+%           Edit ROI                    - 'e'
+%           Toggle Viewing ROIs         - 'v'
+%           Toggle Motion Correction    - 'm'
+%           Next Frame                  - 'd' or right arrow
+%           Last Frame                  - 'a' or left arrow
+%           Play/Pause                  - spacebar or 'enter'
 %       ROI being edited
-%           Save ROI        - spacebar, 'enter', or 'r'
-%           Delete ROI      - 'backspace', 'delete', or 'e'
-%           Move up         - 'w' or up arrow
-%           Move down       - 's' or down arrow
-%           Move right      - 'd' or right arrow
-%           Move left       - 'a' or left arrow
-%           Move deeper     - '>'
-%           Move shallower  - '<'
+%           Save ROI                    - spacebar, 'enter', or 'r'
+%           Delete ROI                  - 'backspace', 'delete', or 'e'
+%           Move up                     - 'w' or up arrow
+%           Move down                   - 's' or down arrow
+%           Move right                  - 'd' or right arrow
+%           Move left                   - 'a' or left arrow
+%           Move deeper                 - '>'
+%           Move shallower              - '<'
 
 
 %% Parse input arguments
@@ -794,7 +796,7 @@ else % Post Data Loaded
             if ~isempty(eventData.Modifier)
                 step = 10;
             else
-                step = 1;
+                step = .5;
             end
             switch eventData.Key
                 case {'uparrow','w'} %translate ROI up

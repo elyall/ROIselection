@@ -32,28 +32,33 @@ sizeRAM = 32000000000; % amount of memory on your computer (UNIX-only)
 %% Parse input arguments
 index = 1;
 while index<=length(varargin)
-    switch varargin{index}
-        case {'Save', 'save'}
-            saveOut = true;
-            index = index + 1;
-        case 'saveFile'
-            saveFile = varargin{index+1};
-            index = index + 2;
-        case 'GPU'
-            GPU = true;
-            index = index + 1;
-        case 'loadType'
-            loadType = varargin{index+1};
-            index = index + 2;
-        case 'MotionCorrect'
-            MotionCorrect = varargin{index+1};
-            index = index + 2;
-        case 'Frames'
-            FrameIndex = varargin{index+1};
-            index = index + 2;
-        otherwise
-            warning('Argument ''%s'' not recognized',varargin{index});
-            index = index + 1;
+    try
+        switch varargin{index}
+            case {'Save', 'save'}
+                saveOut = true;
+                index = index + 1;
+            case 'saveFile'
+                saveFile = varargin{index+1};
+                index = index + 2;
+            case 'GPU'
+                GPU = true;
+                index = index + 1;
+            case 'loadType'
+                loadType = varargin{index+1};
+                index = index + 2;
+            case 'MotionCorrect'
+                MotionCorrect = varargin{index+1};
+                index = index + 2;
+            case 'Frames'
+                FrameIndex = varargin{index+1};
+                index = index + 2;
+            otherwise
+                warning('Argument ''%s'' not recognized',varargin{index});
+                index = index + 1;
+        end
+    catch
+        warning('Argument %d not recognized',index);
+        index = index + 1;
     end
 end
 
@@ -63,9 +68,7 @@ if ~exist('Images', 'var') || isempty(Images)
     if isnumeric(Images)
         return
     elseif iscell(Images)
-        for findex = 1:numel(Images)
-            Images{findex} = fullfile(p, Images{findex});
-        end
+        Images = fullfile(p, Images);
     elseif ischar(Images)
         Images = {fullfile(p, Images)};
     end
@@ -200,7 +203,7 @@ Data = nan(numROIs, numFrames);
 Neuropil = nan(numROIs, numFrames);
 
 % Cycle through frames computing average fluorescence
-fprintf('Extracting signals from %d frames for %d ROIs: %s\n', numFrames, numROIs, ROIFile)
+fprintf('Extracting signals from %d frames for %d ROIs: %s\n', totalFrames, numROIs, ROIFile)
 for bindex = 1:numFramesPerLoad:totalFrames % direct loading only -> load frames in batches
     lastframe = min(bindex+numFramesPerLoad-1, totalFrames);
     currentFrames = FrameIndex(bindex:lastframe);
