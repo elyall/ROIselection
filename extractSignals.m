@@ -37,7 +37,7 @@ while index<=length(varargin)
             case {'Save', 'save'}
                 saveOut = true;
                 index = index + 1;
-            case 'saveFile'
+            case {'SaveFile', 'saveFile'}
                 saveFile = varargin{index+1};
                 index = index + 2;
             case 'GPU'
@@ -253,7 +253,7 @@ for rindex = 1:numROIs
         ROIdata.rois(ROIid(rindex)).rawneuropil(FrameIndex) = Neuropil(rindex, FrameIndex);
     end
 end
-fprintf('\nFinished extracting signals from %d frames for %d ROIs in %.1f minutes\n', numFrames, numROIs, ROIFile, toc/60)
+fprintf('\nFinished extracting signals from %d frames for %d ROIs in %.1f minutes\n', numFrames, numROIs, toc/60)
 
 %% Save data to file
 if saveOut
@@ -265,5 +265,5 @@ if saveOut
     if exist('ImageFiles', 'var')
         save(saveFile, 'ImageFiles', '-mat', '-append');
     end
-    fprintf('ROIdata saved to: %s\n', saveFile);
+    fprintf('\tROIdata saved to: %s\n', saveFile);
 end
