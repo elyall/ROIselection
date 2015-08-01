@@ -50,10 +50,10 @@ while index<=length(varargin)
             case 'LoadType'
                 LoadType = varargin{index+1};
                 index = index + 2;
-            case 'Frames'
+            case {'Frames', 'frames'}
                 Frames = varargin{index+1};
                 index = index + 2;
-            case 'Channels'
+            case {'Channels', 'channels'}
                 Channels = varargin{index+1};
                 index = index + 2;
             otherwise
@@ -1389,8 +1389,8 @@ if iscell(eventdata) % arguments specified in function call
     
     Files = eventdata{1};
     gd.Images.loadType = eventdata{2};
-%     Frames = eventdata{3};
-    CHannels = eventdata{4};
+    Frames = eventdata{3};
+    Channels = eventdata{4};
     
 else % gui button pressed
     
@@ -1844,6 +1844,7 @@ updateGUI(gd)
 plotmainaxes([],[],gd); % Display current image with ROIs overlayed
 
 function SaveROIs(hObject,eventdata,gd)
+
 [~,f,~]=fileparts(gd.Images.filenames{1});
 [f,p] = uiputfile({'*.rois';'*.mat'},'Save ROI file as',sprintf('%s',fullfile(gd.Internal.directory,f)));
 if f==0
@@ -1876,10 +1877,10 @@ if gd.state.experimentAvailable
 %     end
 end
 drawnow
-if exist(fullfile(p,f), 'file')
-    save(fullfile(p,f),VariablesToSave{:},'-append','-mat');
+if exist(gd.ROIs.filename, 'file')
+    save(gd.ROIs.filename,VariablesToSave{:},'-append','-mat');
 else
-    save(fullfile(p,f),VariablesToSave{:},'-mat', '-v7.3');
+    save(gd.ROIs.filename,VariablesToSave{:},'-mat', '-v7.3');
 end
 set(gcf, 'pointer', 'arrow')
 fprintf('ROIs saved to: %s \n', fullfile(p,f));
