@@ -49,7 +49,7 @@ while index<=length(varargin)
             case 'MotionCorrect'
                 MotionCorrect = varargin{index+1};
                 index = index + 2;
-            case 'Frames'
+            case {'Frames', 'frames', 'FrameIndex'}
                 FrameIndex = varargin{index+1};
                 index = index + 2;
             otherwise
@@ -140,11 +140,11 @@ if iscellstr(Images) % filename input
     Height = loadObj.Height;
     Width = loadObj.Width;
     Depth = loadObj.Depth;
-    numFrames = sum([loadObj.files(:).Frames]);
+    totalFrames = sum([loadObj.files(:).Frames]);
 else % numeric array input
     loadType = false;
-    [Height, Width, Depth, ~, numFrames] = size(Images);
-    numFramesPerLoad = numFrames;
+    [Height, Width, Depth, ~, totalFrames] = size(Images);
+    numFramesPerLoad = totalFrames;
 end
 if Depth > 1
     error('Currently does not work for datasets with multiple z-planes');
@@ -166,9 +166,9 @@ end
 
 %% Determine frames to process
 if FrameIndex(end)==inf
-    FrameIndex = cat(2, FrameIndex(1:end-1), FrameIndex(end-1)+1:numFrames);
+    FrameIndex = cat(2, FrameIndex(1:end-1), FrameIndex(end-1)+1:totalFrames);
 end
-totalFrames = numel(FrameIndex);
+numFrames = numel(FrameIndex);
 
 
 %% Load in motion correction information
@@ -199,13 +199,13 @@ DataMasks(~DataMasks) = NaN; % turn logical 0s to NaNs for NANMEAN
 NeuropilMasks(~NeuropilMasks) = NaN; % turn logical 0s to NaNs for NANMEAN
 
 % Initialize output
-Data = nan(numROIs, numFrames);
-Neuropil = nan(numROIs, numFrames);
+Data = nan(numROIs, totalFrames);
+Neuropil = nan(numROIs, totalFrames);
 
 % Cycle through frames computing average fluorescence
-fprintf('Extracting signals from %d frames for %d ROIs: %s\n', totalFrames, numROIs, ROIFile)
-for bindex = 1:numFramesPerLoad:totalFrames % direct loading only -> load frames in batches
-    lastframe = min(bindex+numFramesPerLoad-1, totalFrames);
+fprintf('Extracting signals from %d frames for %d ROIs: %s\n', numFrames, numROIs, ROIFile)
+for bindex = 1:numFramesPerLoad:numFrames % direct loading only -> load frames in batches
+    lastframe = min(bindex+numFramesPerLoad-1, numFrames);
     currentFrames = FrameIndex(bindex:lastframe);
     
     % direct loading only -> load current batch
@@ -244,16 +244,18 @@ for bindex = 1:numFramesPerLoad:totalFrames % direct loading only -> load frames
     end %findex
 end %bindex
 
+% Distribute data to structure
 for rindex = 1:numROIs
     if isempty(ROIdata.rois(ROIid(rindex)).rawdata) % replace whole vector
         ROIdata.rois(ROIid(rindex)).rawdata = Data(rindex, :);
         ROIdata.rois(ROIid(rindex)).rawneuropil = Neuropil(rindex, :);
-    else
+    else % replace frames that were computed
         ROIdata.rois(ROIid(rindex)).rawdata(FrameIndex) = Data(rindex, FrameIndex);
         ROIdata.rois(ROIid(rindex)).rawneuropil(FrameIndex) = Neuropil(rindex, FrameIndex);
     end
 end
 fprintf('\nFinished extracting signals from %d frames for %d ROIs in %.1f minutes\n', numFrames, numROIs, toc/60)
+
 
 %% Save data to file
 if saveOut
