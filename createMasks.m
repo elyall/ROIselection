@@ -65,9 +65,11 @@ end
 
 if exist('ROIdata', 'var')
     if ROIindex(end) == inf
-        ROIindex = cat(2, ROIindex(1:end-1), ROIindex(end-1)+1, numel(ROIdata.rois));
+        ROIindex = cat(2, ROIindex(1:end-1), ROIindex(end-1)+1:numel(ROIdata.rois));
     end
     ROIMasks = reshape([ROIdata.rois(ROIindex).pixels], size(ROIdata.rois(1).pixels,1), size(ROIdata.rois(1).pixels,2), numel(ROIindex));
+elseif ROIindex(end) == inf
+    ROIindex = cat(2, ROIindex(1:end-1), ROIindex(end-1)+1:size(ROIMasks,3));
 end
 
 
@@ -76,36 +78,36 @@ end
 countMatrix = sum(ROIMasks, 3);                    % determine number of ROIs found in each pixel
 
 
-%% Create neuropil masks
-if isempty(BorderSE)
-    NeuropilMasks = imdilate(ROIMasks, NeuropilSE) - ROIMasks;                          % do not create a buffer region
-else
-    NeuropilMasks = imdilate(ROIMasks, NeuropilSE) - imdilate(ROIMasks, BorderSE);      % place buffer region between neuropil mask and ROI mask
-end
-
-% SBX method
-% g = exp(-(-10:10).^2/2/2^2);
-% maskb = conv2(g,g,double(countMatrix>0),'same')>.02;                                    % dilation for border region around ROIs
-% [xi,yi] = meshgrid(1:796,1:512);
-% centroids = reshape([ROIdata.rois(:).centroid], 2, numROIs)';
-% for rindex = 1:numROIs
-%     for neuropilrad = 40:5:100
-%         M = (xi-centroids(rindex,1)).^2+(yi-centroids(rindex,2)).^2 < neuropilrad^2;    % mask of pixels within the radius
-%         NeuropilMasks(:,:,rindex) = M.*~maskb;                                          % remove ROIs and border regions
-%         if nnz(NeuropilMasks(:,:,rindex)) > 4000
-%             break
-%         end
-%     end
-% end
-
-
-%% Remove neighboring ROIs from neuropil masks
-NeuropilMasks(repmat(logical(countMatrix), 1, 1, numROIs)) = 0;
-
-
 %% Remove overlapping regions from ROI masks
 overlap = countMatrix > 1;                         % define regions where ROIs overlap
 ROIMasks(repmat(overlap, 1, 1, numROIs)) = 0;      % remove regions of overlap from ROI masks
+
+
+%% Create neuropil masks
+% if isempty(BorderSE)
+%     NeuropilMasks = imdilate(ROIMasks, NeuropilSE) - ROIMasks;                          % do not create a buffer region
+% else
+%     NeuropilMasks = imdilate(ROIMasks, NeuropilSE) - imdilate(ROIMasks, BorderSE);      % place buffer region between neuropil mask and ROI mask
+% end
+% 
+% % Remove neighboring ROIs from neuropil masks
+% NeuropilMasks(repmat(logical(countMatrix), 1, 1, numROIs)) = 0;
+
+
+% SBX method
+g = exp(-(-10:10).^2/2/2^2);
+maskb = conv2(g,g,double(logical(countMatrix)),'same')>.02;                                    % dilation for border region around ROIs
+[xi,yi] = meshgrid(1:796,1:512);
+centroids = reshape([ROIdata.rois(:).centroid], 2, numROIs)';
+for rindex = 1:numROIs
+    for neuropilrad = 40:5:100
+        M = (xi-centroids(rindex,1)).^2+(yi-centroids(rindex,2)).^2 < neuropilrad^2;    % mask of pixels within the radius
+        NeuropilMasks(:,:,rindex) = M.*~maskb;                                          % remove ROIs and border regions
+        if nnz(NeuropilMasks(:,:,rindex)) > 4000
+            break
+        end
+    end
+end
 
 
 %% Select a subsampling of neuropil pixels to ensure an equal signal to noise

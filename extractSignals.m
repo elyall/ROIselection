@@ -18,7 +18,7 @@ function [ROIdata, Data, Neuropil, ROIid] = extractSignals(Images, ROIdata, ROIi
 % previous designated frame (ex: default is [1, inf] specifying all
 % frames).
 
-GPU = true; % true or false
+GPU = false; % true or false
 loadType = 'Direct'; % 'MemMap' or 'Direct'
 saveOut = true; % true or false
 saveFile = ''; % filename to save ROIdata output to (defaults to ROIFile if one is input)
@@ -97,7 +97,7 @@ if isequal(MotionCorrect, true) % prompt for file selection
     end
 end
 
-tic
+
 %% Load in Data and determine dimensions
 
 % ROIs
@@ -173,12 +173,12 @@ numFrames = numel(FrameIndex);
 
 %% Load in motion correction information
 if ischar(MotionCorrect) % load in MCdata structure
-        load(MotionCorrect, 'MCdata', '-mat')
-        if ~exist('MCdata', 'var')
-            MotionCorrect = false;
-        else
-            MotionCorrect = true;
-        end
+    load(MotionCorrect, 'MCdata', '-mat')
+    if ~exist('MCdata', 'var')
+        MotionCorrect = false;
+    else
+        MotionCorrect = true;
+    end
 elseif isstruct(MotionCorrect) % MCdata structure input
     MCdata = MotionCorrect;
     MotionCorrect = true;
@@ -187,64 +187,105 @@ end
 
 %% Cycle through each ROI averaging pixels within each frame
 
-% Create masks (1s of pixels to average, NaNs of pixels to ignore)
-if GPU
-    DataMasks = gpuArray(double(reshape([ROIdata.rois(ROIid).mask], [Height*Width, numROIs])));
-    NeuropilMasks = gpuArray(double(reshape([ROIdata.rois(ROIid).neuropilmask], [Height*Width, numROIs])));
-else
-    DataMasks = double(reshape([ROIdata.rois(ROIid).mask], [Height*Width, numROIs]));
-    NeuropilMasks = double(reshape([ROIdata.rois(ROIid).neuropilmask], [Height*Width, numROIs]));
-end
-DataMasks(~DataMasks) = NaN; % turn logical 0s to NaNs for NANMEAN
-NeuropilMasks(~NeuropilMasks) = NaN; % turn logical 0s to NaNs for NANMEAN
-
 % Initialize output
 Data = nan(numROIs, totalFrames);
 Neuropil = nan(numROIs, totalFrames);
 
 % Cycle through frames computing average fluorescence
-fprintf('Extracting signals from %d frames for %d ROIs: %s\n', numFrames, numROIs, ROIFile)
-for bindex = 1:numFramesPerLoad:numFrames % direct loading only -> load frames in batches
-    lastframe = min(bindex+numFramesPerLoad-1, numFrames);
-    currentFrames = FrameIndex(bindex:lastframe);
+fprintf('Extracting signals for %d ROI(s) from %d frame(s): %s\n', numROIs, numFrames, ROIFile)
+tic;
+if GPU
+    fprintf('\trequires %d batches with %d frames per batch...\n', ceil(numFrames/numFramesPerLoad), numFramesPerLoad);
+
+    % Define masks
+    DataMasks = gpuArray(double(reshape([ROIdata.rois(ROIid).mask], [Height*Width, numROIs])));
+    NeuropilMasks = gpuArray(double(reshape([ROIdata.rois(ROIid).neuropilmask], [Height*Width, numROIs])));
+    DataMasks(~DataMasks) = NaN; % turn logical 0s to NaNs for NANMEAN
+    NeuropilMasks(~NeuropilMasks) = NaN; % turn logical 0s to NaNs for NANMEAN
     
-    % direct loading only -> load current batch
-    if strcmp(loadType, 'Direct')
-        [Images, loadObj] = load2P(ImageFiles, 'Type', 'Direct', 'Frames', currentFrames); %direct
+    % Cycle through frames in batches
+    for bindex = 1:numFramesPerLoad:numFrames % direct loading only -> load frames in batches
+        lastframe = min(bindex+numFramesPerLoad-1, numFrames);
+        currentFrames = FrameIndex(bindex:lastframe);
+        
+        % direct loading only -> load current batch
+        if strcmp(loadType, 'Direct')
+            if bindex ~= 1
+                fprintf('\n');
+            end
+            [Images, loadObj] = load2P(ImageFiles, 'Type', 'Direct', 'Frames', currentFrames); %direct
+        end
+        
+        % Correct for motion
+        if MotionCorrect
+            fprintf('\b\tCorrecting motion...');
+            Images = applyMotionCorrection(Images, MCdata, loadObj);
+            fprintf('\tComplete\n');
+        end
+        
+        % Reshape images
+        numImages = size(Images, 5);
+        Images = double(reshape(Images(:,:,1,1,:), Height*Width, numImages));
+        
+        fprintf('Finished frame: ');
+        reverseStr = '';
+        for findex = 1:numImages
+            
+            % Calculate fluorescence signal
+            Data(:,currentFrames(findex)) = gather(nanmean(bsxfun(@times, DataMasks, Images(:,findex)), 1));
+            Neuropil(:,currentFrames(findex)) = gather(nanmean(bsxfun(@times, NeuropilMasks, Images(:,findex)), 1));
+            
+            % Update status
+            if ~mod(findex, 20)
+                currentFrame = bindex+findex-1;
+                msg = sprintf('%d - %.1f min remain - %3.1f', currentFrame, (toc/currentFrame)*(numFrames-currentFrame)/60, currentFrame/numFrames*100);
+                fprintf([reverseStr, msg, '%%']);
+                reverseStr = repmat(sprintf('\b'), 1, numel(msg)+1);
+            end
+            
+        end %findex
+    end %bindex
+    
+else % No GPU
+    
+    % Define masks
+    DataMasks = cell(numROIs, 1);
+    NeuropilMasks = cell(numROIs, 1);
+    for rindex = 1:numROIs
+        DataMasks{rindex} = find(ROIdata.rois(ROIid(rindex)).mask);
+        NeuropilMasks{rindex} = find(ROIdata.rois(ROIid(rindex)).neuropilmask);
     end
     
-    % Correct for motion
-    if MotionCorrect
-        fprintf('Correcting motion...');
-        Images = applyMotionCorrection(Images, MCdata, loadObj);
-        fprintf('\tComplete\n');
-    end
-    
-    fprintf('\tFinished frame:');
-    for findex = 1:size(Images, 5);
-                
+    % fprintf(['Finished frame: ', sprintf('%10d - %10.1f', 0, 0), '%%']);
+    parfor_progress(numel(FrameIndex));
+    parfor findex = FrameIndex
+        
+        % Load Frame
+        [img, loadObj] = load2P(ImageFiles, 'Type', 'Direct', 'Frames', findex, 'Verbose', false); %direct
+        
+        % Correct for motion
+        if MotionCorrect
+            img = applyMotionCorrection(img, MCdata, loadObj);
+        end
+
         % Calculate fluorescence signal
-        img = double(reshape(Images(:,:,1,1,findex), Height*Width, 1));
-        if GPU
-            Data(:,currentFrames(findex)) = gather(nanmean(bsxfun(@times, DataMasks, img), 1));
-            Neuropil(:,currentFrames(findex)) = gather(nanmean(bsxfun(@times, NeuropilMasks, img), 1));
-        else
-            Data(:,currentFrames(findex)) = nanmean(bsxfun(@times, DataMasks, img), 1);
-            Neuropil(:,currentFrames(findex)) = nanmean(bsxfun(@times, NeuropilMasks, img), 1);
+        for rindex = 1:numROIs
+            Data(rindex,findex) = mean(img(DataMasks{rindex}));
+            Neuropil(rindex,findex) = mean(img(NeuropilMasks{rindex}));
+            % Neuropil(rindex,findex) = trimmean(img(NeuropilMasks{rindex}), 10); % sbx method
         end
         
         % Update status
-        if ~mod(currentFrames(findex), 20)
-            fprintf('\t%d', currentFrames(findex))
-            if ~mod(currentFrames(findex), 600)
-                fprintf('\n\tFinished frame:');
-            end
-        end
+        parfor_progress;
         
     end %findex
-end %bindex
+    parfor_progress(0);
+    
+end %GPU
+fprintf('\nFinished extracting signals for %d ROI(s) from %d frame(s)\nSession took: %.1f minutes\n', numROIs, numFrames, toc/60)
 
-% Distribute data to structure
+
+%% Distribute data to structure
 for rindex = 1:numROIs
     if isempty(ROIdata.rois(ROIid(rindex)).rawdata) % replace whole vector
         ROIdata.rois(ROIid(rindex)).rawdata = Data(rindex, :);
@@ -254,7 +295,6 @@ for rindex = 1:numROIs
         ROIdata.rois(ROIid(rindex)).rawneuropil(FrameIndex) = Neuropil(rindex, FrameIndex);
     end
 end
-fprintf('\nFinished extracting signals from %d frames for %d ROIs in %.1f minutes\n', numFrames, numROIs, toc/60)
 
 
 %% Save data to file

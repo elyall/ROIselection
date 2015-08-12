@@ -5,7 +5,7 @@ function [Images, Config] = readScim(TifFile, varargin)
 LoadType = 'Direct'; % 'MemMap' or 'Direct'
 Frames = 1:20; % indices of frames to load in 'Direct' mode, or 'all'
 Channels = 1;
-SaveDirect = false;
+Verbose = true;
 
 warning('off','MATLAB:imagesci:tiffmexutils:libtiffWarning');
 
@@ -22,6 +22,9 @@ while index<=length(varargin)
                 index = index + 2;
             case {'Type','type'}
                 LoadType = varargin{index+1}; %'Direct' or 'MemMap'
+                index = index + 2;
+            case {'Verbose', 'verbose'}
+                Verbose = varargin{index+1};
                 index = index + 2;
             otherwise
                 warning('Argument ''%s'' not recognized',varargin{index});
@@ -61,7 +64,10 @@ switch LoadType
             Frames = [Frames(1:end-2),Frames(end-1):info.numFrames];
         end
         
-        fprintf('Loading\t%d\tframe(s) from\t%s...', numel(Frames), TifFile);
+        if Verbose
+            fprintf('Loading\t%d\tframe(s) from\t%s...', numel(Frames), TifFile);
+        end
+        
         [~,Images] = scim_openTif(TifFile, 'frames', Frames, 'channels', Channels);
         
         if Config.Depth == 1
@@ -102,16 +108,9 @@ switch LoadType
         % Images=double(Images);
         % close(wb);
         
-        fprintf('\tComplete\n');
-        if SaveDirect
-            fprintf('\tSaving frames to mat file');
-            savefn = [TifFile(1:end-4),'_EL.mat'];
-            n=1;
-            while exist(savefn,'file')
-                savefn = [TifFile(1:end-4),sprintf('%d_EL.mat',n)];
-                n = n + 1;
-            end
-            save(savefn, 'Images', 'info', '-v7.3');
+        if Verbose
+            fprintf('\tComplete\n');
         end
+        
 end
 

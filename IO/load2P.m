@@ -23,6 +23,7 @@ Frames = [1, inf]; % indices of frames to load in 'Direct' mode, or 'all'
 Channels = inf;
 Double = false;
 SaveToMat = false;
+Verbose = true;
 
 %% Initialize Parameters
 if ~exist('ImageFiles', 'var') || isempty(ImageFiles)
@@ -66,6 +67,9 @@ while index<=length(varargin)
             case {'Double', 'double'}
                 Double = true;
                 index = index + 1;
+            case {'Verbose', 'verbose'}
+                Verbose = varargin{index+1};
+                index = index + 2;
             otherwise
                 warning('Argument ''%s'' not recognized',varargin{index});
                 index = index + 1;
@@ -177,10 +181,10 @@ switch LoadType
                 switch loadObj.files(index).ext
                     case '.sbx'
                         Images(:,:,:,:,startFrame(index):startFrame(index)+numFrames(index)-1)...
-                            = readSbx(ImageFiles{index}, [], 'Type', 'Direct', 'Frames', FrameIndex{index}, 'Channels', Channels);
+                            = readSbx(ImageFiles{index}, [], 'Type', 'Direct', 'Frames', FrameIndex{index}, 'Channels', Channels, 'Verbose', Verbose);
                     case '.tif'
                         Images(:,:,:,:,startFrame(index):startFrame(index)+numFrames(index)-1)...
-                            = readScim(ImageFiles{index}, 'Frames', FrameIndex{index}, 'Channels', Channels);
+                            = readScim(ImageFiles{index}, 'Frames', FrameIndex{index}, 'Channels', Channels, 'Verbose', Verbose);
                     case '.imgs'
                         Images(:,:,:,:,startFrame(index):startFrame(index)+numFrames(index)-1)...
                             = readImgs(ImageFiles{index}, 'Type', 'Direct', 'Frames', FrameIndex{index}, 'Channels', Channels);

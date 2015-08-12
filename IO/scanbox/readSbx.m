@@ -5,7 +5,7 @@ function [Images, Config, InfoFile] = readSbx(SbxFile, InfoFile, varargin)
 LoadType = 'Direct'; % 'MemMap' or 'Direct'
 Frames = 1:20; % indices of frames to load in 'Direct' mode, or 'all'
 Channels = 1;
-SaveDirect = false;
+Verbose = true;
 
 % Defaults
 invert = true;
@@ -27,6 +27,9 @@ while index<=length(varargin)
                 index = index + 2;
             case {'Invert', 'invert'}
                 invert = varargin{index+1};
+                index = index + 2;
+            case {'Verbose', 'verbose'}
+                Verbose = varargin{index+1};
                 index = index + 2;
             otherwise
                 warning('Argument ''%s'' not recognized',varargin{index});
@@ -117,7 +120,10 @@ switch LoadType
         if(info.fid ~= -1)
             
             % Load Images
-            fprintf('Loading\t%d\tframe(s) from\t%s...', numel(Frames), SbxFile);
+            if Verbose
+                fprintf('Loading\t%d\tframe(s) from\t%s...', numel(Frames), SbxFile);
+            end
+            
             for index = 1:length(seekoperations)
                 if(fseek(info.fid, Config.Height * Config.Width * 2 * Frames(seekoperations(index)) * Config.Channels, 'bof')==0) % "2" b/c assumes uint16 => 2 bytes per record
                     temp = fread(info.fid, Config.Height * Config.Width * Config.Channels * numframesperread(index), 'uint16=>uint16');
@@ -172,15 +178,8 @@ switch LoadType
         
         Config.size = size(Images);
         
-        fprintf('\tComplete\n');
-        if SaveDirect
-            fprintf('\tSaving frames to mat file');
-            savefn = [SbxFile(1:end-4),'_EL.mat'];
-            n=1;
-            while exist(savefn,'file')
-                savefn = [SbxFile(1:end-4),sprintf('%d_EL.mat',n)];
-                n = n + 1;
-            end
-            save(savefn, 'Images', 'info', '-v7.3');
+        if Verbose
+            fprintf('\tComplete\n');
         end
+
 end
