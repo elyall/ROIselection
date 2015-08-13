@@ -44,7 +44,7 @@ while index<=length(varargin)
 end
 
 if ~exist('ROIMasks', 'var') || isempty(ROIMasks)
-    [ROIMasks,p] = uigetfile({'*.rois;*.mat'},'Select ROI file:',directory);
+    [ROIMasks,p] = uigetfile({'*.rois;*.segment'},'Select ROI file:',directory);
     if isnumeric(ROIMasks)
         return
     end
@@ -58,7 +58,13 @@ if ischar(ROIMasks)
     if saveOut && isempty(saveFile)
         saveFile = ROIFile;
     end
-    load(ROIFile, 'ROIdata', '-mat');
+    [~,~,ext] = fileparts(ROIFile);
+    switch ext
+        case '.rois'
+            load(ROIFile, 'ROIdata', '-mat');
+        case '.segment'
+            load(ROIFile, 'mask', '-mat');
+    end
 elseif isstruct(ROIMasks)
     ROIdata = ROIMasks;
 end

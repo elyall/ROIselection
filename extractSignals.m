@@ -18,7 +18,7 @@ function [ROIdata, Data, Neuropil, ROIid] = extractSignals(Images, ROIdata, ROIi
 % previous designated frame (ex: default is [1, inf] specifying all
 % frames).
 
-GPU = false; % true or false
+GPU = false; % true or false (faster without CPU if large frame size and computer contains multicore processors)
 loadType = 'Direct'; % 'MemMap' or 'Direct'
 saveOut = true; % true or false
 saveFile = ''; % filename to save ROIdata output to (defaults to ROIFile if one is input)
@@ -28,6 +28,8 @@ FrameIndex = [1, inf]; % vector of frame indices
 % Memory settings
 portionOfMemory = 0.08; % find 10% or less works best
 sizeRAM = 32000000000; % amount of memory on your computer (UNIX-only)
+
+directory = cd;
 
 %% Parse input arguments
 index = 1;
@@ -63,7 +65,6 @@ while index<=length(varargin)
 end
 
 if ~exist('Images', 'var') || isempty(Images)
-    directory = CanalSettings('DataDirectory');
     [Images,p] = uigetfile({'*.imgs;*.sbx;*.tif'},'Select image file(s):',directory,'MultiSelect','on');
     if isnumeric(Images)
         return
@@ -77,7 +78,6 @@ elseif ischar(Images)
 end
 
 if ~exist('ROIdata', 'var') || isempty(ROIdata)
-    directory = CanalSettings('DataDirectory');
     [ROIdata,p] = uigetfile({'*.rois;*.mat'},'Select ROI file:',directory);
     if isnumeric(ROIdata)
         return
