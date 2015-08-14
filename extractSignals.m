@@ -20,7 +20,7 @@ function [ROIdata, Data, Neuropil, ROIid] = extractSignals(Images, ROIdata, ROIi
 
 GPU = false; % true or false (faster without CPU if large frame size and computer contains multicore processors)
 loadType = 'Direct'; % 'MemMap' or 'Direct'
-saveOut = true; % true or false
+saveOut = false; % true or false
 saveFile = ''; % filename to save ROIdata output to (defaults to ROIFile if one is input)
 MotionCorrect = false; % false, filename to load MCdata from, or true to prompt for file selection
 FrameIndex = [1, inf]; % vector of frame indices
@@ -90,7 +90,6 @@ if ~exist('ROIid', 'var') || isempty(ROIid)
 end
 
 if isequal(MotionCorrect, true) % prompt for file selection
-    directory = CanalSettings('ExperimentDirectory');
     [MotionCorrect, p] = uigetfile({'*.mat'},'Choose Experiment file to load MCdata from:',directory);
     if ischar(MotionCorrect)
         MotionCorrect = fullfile(p, MotionCorrect);
