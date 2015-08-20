@@ -1,5 +1,5 @@
-function [ROIdata, Data, Neuropil, ROIid] = extractSignals(Images, ROIdata, ROIid, varargin)
-% [ROIdata, Data, Neuropil] = extractSignals2(Images, ROIdata, ROIid, varargin)
+function [ROIdata, Data, Neuropil, ROIindex] = extractSignals(Images, ROIdata, ROIindex, varargin)
+% [ROIdata, Data, Neuropil] = extractSignals(Images, ROIdata, ROIid, varargin)
 % INPUTS:
 % Images - images or filename(s) (cell array of strings or string)
 % ROIdata - ROIdata (struct) or filename (string)
@@ -85,8 +85,8 @@ if ~exist('ROIdata', 'var') || isempty(ROIdata)
     ROIdata = fullfile(p, ROIdata);
 end
 
-if ~exist('ROIid', 'var') || isempty(ROIid)
-    ROIid = 'all'; % 'all' or 'new' or vector of indices
+if ~exist('ROIindex', 'var') || isempty(ROIindex)
+    ROIindex = 'all'; % 'all' or 'new' or vector of indices
 end
 
 if isequal(MotionCorrect, true) % prompt for file selection
@@ -107,7 +107,7 @@ if ischar(ROIdata) % filename input
         saveFile = ROIFile;
     end
 else
-    ROIFile = '';
+    ROIFile = 'file 1';
 end
 if saveOut && isempty(saveFile)
     warning('Cannot save output as no file specified');
@@ -151,17 +151,24 @@ end
 
 
 %% Determine ROIs to extract signals for
-if ischar(ROIid)
-    switch ROIid
-        case 'all'
-            numROIs = numel(ROIdata.rois);
-            ROIid = 1:numROIs;
-        case 'new'
-            ROIid = find(arrayfun(@(x) (isempty(x.rawdata)), ROIdata.rois));
-            numROIs = numel(ROIid);
+if ischar(ROIindex)
+    switch ROIindex
+        case {'all', 'All'}
+            ROIindex = 1:numel(ROIdata.rois);
+        case {'new', 'New'}
+            ROIindex = find(arrayfun(@(x) (isempty(x.rawdata)), ROIdata.rois));
     end
+elseif isnumeric(ROIindex) && ROIindex(end) == inf
+    ROIindex = [ROIindex(1:end-1), ROIindex(end-1)+1:numel(ROIdata.rois)];
 end
+numROIs = numel(ROIindex);
 
+if numROIs == 0
+    fprintf('No new ROIs to extract signals from: %s\n', ROIFile);
+    Data = [];
+    Neuropil = [];
+    return
+end
 
 %% Determine frames to process
 if FrameIndex(end)==inf
@@ -197,8 +204,8 @@ if GPU
     fprintf('\trequires %d batches with %d frames per batch...\n', ceil(numFrames/numFramesPerLoad), numFramesPerLoad);
 
     % Define masks
-    DataMasks = gpuArray(double(reshape([ROIdata.rois(ROIid).mask], [Height*Width, numROIs])));
-    NeuropilMasks = gpuArray(double(reshape([ROIdata.rois(ROIid).neuropilmask], [Height*Width, numROIs])));
+    DataMasks = gpuArray(double(reshape([ROIdata.rois(ROIindex).mask], [Height*Width, numROIs])));
+    NeuropilMasks = gpuArray(double(reshape([ROIdata.rois(ROIindex).neuropilmask], [Height*Width, numROIs])));
     DataMasks(~DataMasks) = NaN; % turn logical 0s to NaNs for NANMEAN
     NeuropilMasks(~NeuropilMasks) = NaN; % turn logical 0s to NaNs for NANMEAN
     
@@ -230,9 +237,10 @@ if GPU
         reverseStr = '';
         for findex = 1:numImages
             
+
             % Calculate fluorescence signal
-            Data(:,currentFrames(findex)) = gather(nanmean(bsxfun(@times, DataMasks, Images(:,findex)), 1));
-            Neuropil(:,currentFrames(findex)) = gather(nanmean(bsxfun(@times, NeuropilMasks, Images(:,findex)), 1));
+            Data(:,currentFrames(findex)) = gather(nanmean(bsxfun(@times, DataMasks, gpuArray(Images(:,findex))), 1));
+            Neuropil(:,currentFrames(findex)) = gather(nanmean(bsxfun(@times, NeuropilMasks, gpuArray(Images(:,findex))), 1));
             
             % Update status
             if ~mod(findex, 20)
@@ -251,11 +259,10 @@ else % No GPU
     DataMasks = cell(numROIs, 1);
     NeuropilMasks = cell(numROIs, 1);
     for rindex = 1:numROIs
-        DataMasks{rindex} = find(ROIdata.rois(ROIid(rindex)).mask);
-        NeuropilMasks{rindex} = find(ROIdata.rois(ROIid(rindex)).neuropilmask);
+        DataMasks{rindex} = find(ROIdata.rois(ROIindex(rindex)).mask);
+        NeuropilMasks{rindex} = find(ROIdata.rois(ROIindex(rindex)).neuropilmask);
     end
     
-    % fprintf(['Finished frame: ', sprintf('%10d - %10.1f', 0, 0), '%%']);
     parfor_progress(numel(FrameIndex));
     parfor findex = FrameIndex
         
@@ -286,12 +293,12 @@ fprintf('\nFinished extracting signals for %d ROI(s) from %d frame(s)\nSession t
 
 %% Distribute data to structure
 for rindex = 1:numROIs
-    if isempty(ROIdata.rois(ROIid(rindex)).rawdata) % replace whole vector
-        ROIdata.rois(ROIid(rindex)).rawdata = Data(rindex, :);
-        ROIdata.rois(ROIid(rindex)).rawneuropil = Neuropil(rindex, :);
+    if isempty(ROIdata.rois(ROIindex(rindex)).rawdata) % replace whole vector
+        ROIdata.rois(ROIindex(rindex)).rawdata = Data(rindex, :);
+        ROIdata.rois(ROIindex(rindex)).rawneuropil = Neuropil(rindex, :);
     else % replace frames that were computed
-        ROIdata.rois(ROIid(rindex)).rawdata(FrameIndex) = Data(rindex, FrameIndex);
-        ROIdata.rois(ROIid(rindex)).rawneuropil(FrameIndex) = Neuropil(rindex, FrameIndex);
+        ROIdata.rois(ROIindex(rindex)).rawdata(FrameIndex) = Data(rindex, FrameIndex);
+        ROIdata.rois(ROIindex(rindex)).rawneuropil(FrameIndex) = Neuropil(rindex, FrameIndex);
     end
 end
 
@@ -305,6 +312,9 @@ if saveOut
     end
     if exist('ImageFiles', 'var')
         save(saveFile, 'ImageFiles', '-mat', '-append');
+    end
+    if isequal(ROIindex, 1:numel(ROIdata.rois))
+        save(saveFile, 'Data', 'Neuropil', '-mat', '-append');
     end
     fprintf('\tROIdata saved to: %s\n', saveFile);
 end

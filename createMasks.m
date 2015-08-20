@@ -69,6 +69,8 @@ elseif isstruct(ROIMasks)
     ROIdata = ROIMasks;
 end
 
+
+%% Determine ROIs to compute masks for
 if exist('ROIdata', 'var')
     if ROIindex(end) == inf
         ROIindex = cat(2, ROIindex(1:end-1), ROIindex(end-1)+1:numel(ROIdata.rois));
@@ -76,6 +78,9 @@ if exist('ROIdata', 'var')
     ROIMasks = reshape([ROIdata.rois(ROIindex).pixels], size(ROIdata.rois(1).pixels,1), size(ROIdata.rois(1).pixels,2), numel(ROIindex));
 elseif ROIindex(end) == inf
     ROIindex = cat(2, ROIindex(1:end-1), ROIindex(end-1)+1:size(ROIMasks,3));
+end
+if iscolumn(ROIindex)
+    ROIindex = ROIindex';
 end
 
 
@@ -102,9 +107,9 @@ ROIMasks(repmat(overlap, 1, 1, numROIs)) = 0;      % remove regions of overlap f
 
 % SBX method
 g = exp(-(-10:10).^2/2/2^2);
-maskb = conv2(g,g,double(logical(countMatrix)),'same')>.02;                                    % dilation for border region around ROIs
+maskb = conv2(g,g,double(logical(countMatrix)),'same')>.15; %.02                        % dilation for border region around ROIs
 [xi,yi] = meshgrid(1:796,1:512);
-centroids = reshape([ROIdata.rois(:).centroid], 2, numROIs)';
+centroids = reshape([ROIdata.rois(ROIindex).centroid], 2, numROIs)';
 for rindex = 1:numROIs
     for neuropilrad = 40:5:100
         M = (xi-centroids(rindex,1)).^2+(yi-centroids(rindex,2)).^2 < neuropilrad^2;    % mask of pixels within the radius
@@ -131,20 +136,24 @@ if saveOut
     if isempty(saveFile) || ~ischar(saveFile)
         warning('Did not save output to file because file to save to is not specified.');
         return
-    elseif ~exist('ROIdata', 'var')
-        warning('Did not save output to file because initial ROIdata not given.');
-        return
+    end
+    if ~exist('ROIdata', 'var')
+        load(saveFile, 'ROIdata', '-mat')
+        if ~exist('ROIdata', 'var')
+            warning('Did not save output to file because initial ROIdata not given.');
+            return
+        end
     end
     
     % Distribute to structure
-    for rindex = ROIindex
-        if ~isfield(ROIdata.rois, 'mask') || isempty(ROIdata.rois(rindex).mask) || ~isequal(ROIdata.rois(rindex).mask, ROIMasks(:,:,rindex)) || override
-            ROIdata.rois(rindex).rawdata = [];
-            ROIdata.rois(rindex).mask = ROIMasks(:,:,rindex);
+    for rindex = 1:numROIs
+        if ~isfield(ROIdata.rois, 'mask') || isempty(ROIdata.rois(ROIindex(rindex)).mask) || ~isequal(ROIdata.rois(ROIindex(rindex)).mask, ROIMasks(:,:,rindex)) || override
+            ROIdata.rois(ROIindex(rindex)).rawdata = [];
+            ROIdata.rois(ROIindex(rindex)).mask = ROIMasks(:,:,rindex);
         end
-        if ~isfield(ROIdata.rois, 'neuropilmask') || isempty(ROIdata.rois(rindex).neuropilmask) || ~isequal(ROIdata.rois(rindex).neuropilmask, NeuropilMasks(:,:,rindex)) || override
-            ROIdata.rois(rindex).rawneuropil = [];
-            ROIdata.rois(rindex).neuropilmask = NeuropilMasks(:,:,rindex);
+        if ~isfield(ROIdata.rois, 'neuropilmask') || isempty(ROIdata.rois(ROIindex(rindex)).neuropilmask) || ~isequal(ROIdata.rois(ROIindex(rindex)).neuropilmask, NeuropilMasks(:,:,rindex)) || override
+            ROIdata.rois(ROIindex(rindex)).rawneuropil = [];
+            ROIdata.rois(ROIindex(rindex)).neuropilmask = NeuropilMasks(:,:,rindex);
         end
     end
     
