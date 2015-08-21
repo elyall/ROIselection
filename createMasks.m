@@ -65,18 +65,16 @@ if ischar(ROIMasks)
         case '.segment'
             load(ROIFile, 'mask', '-mat');
     end
+    ROIMasks = reshape([ROIdata.rois(:).pixels], size(ROIdata.rois(1).pixels,1), size(ROIdata.rois(1).pixels,2), numel(ROIdata.rois));
 elseif isstruct(ROIMasks)
     ROIdata = ROIMasks;
+    ROIMasks = reshape([ROIdata.rois(:).pixels], size(ROIdata.rois(1).pixels,1), size(ROIdata.rois(1).pixels,2), numel(ROIdata.rois));
 end
+[Height, Width, numROIs] = size(ROIMasks);
 
 
 %% Determine ROIs to compute masks for
-if exist('ROIdata', 'var')
-    if ROIindex(end) == inf
-        ROIindex = cat(2, ROIindex(1:end-1), ROIindex(end-1)+1:numel(ROIdata.rois));
-    end
-    ROIMasks = reshape([ROIdata.rois(ROIindex).pixels], size(ROIdata.rois(1).pixels,1), size(ROIdata.rois(1).pixels,2), numel(ROIindex));
-elseif ROIindex(end) == inf
+if ROIindex(end) == inf
     ROIindex = cat(2, ROIindex(1:end-1), ROIindex(end-1)+1:size(ROIMasks,3));
 end
 if iscolumn(ROIindex)
@@ -84,12 +82,8 @@ if iscolumn(ROIindex)
 end
 
 
-%% Determine location of ROIs
-[Height, Width, numROIs] = size(ROIMasks);
-countMatrix = sum(ROIMasks, 3);                    % determine number of ROIs found in each pixel
-
-
 %% Remove overlapping regions from ROI masks
+countMatrix = sum(ROIMasks, 3);                    % determine number of ROIs found in each pixel
 overlap = countMatrix > 1;                         % define regions where ROIs overlap
 ROIMasks(repmat(overlap, 1, 1, numROIs)) = 0;      % remove regions of overlap from ROI masks
 
@@ -149,11 +143,11 @@ if saveOut
     for rindex = 1:numROIs
         if ~isfield(ROIdata.rois, 'mask') || isempty(ROIdata.rois(ROIindex(rindex)).mask) || ~isequal(ROIdata.rois(ROIindex(rindex)).mask, ROIMasks(:,:,rindex)) || override
             ROIdata.rois(ROIindex(rindex)).rawdata = [];
-            ROIdata.rois(ROIindex(rindex)).mask = ROIMasks(:,:,rindex);
+            ROIdata.rois(ROIindex(rindex)).mask = sparse(ROIMasks(:,:,rindex));
         end
         if ~isfield(ROIdata.rois, 'neuropilmask') || isempty(ROIdata.rois(ROIindex(rindex)).neuropilmask) || ~isequal(ROIdata.rois(ROIindex(rindex)).neuropilmask, NeuropilMasks(:,:,rindex)) || override
             ROIdata.rois(ROIindex(rindex)).rawneuropil = [];
-            ROIdata.rois(ROIindex(rindex)).neuropilmask = NeuropilMasks(:,:,rindex);
+            ROIdata.rois(ROIindex(rindex)).neuropilmask = sparse(NeuropilMasks(:,:,rindex));
         end
     end
     

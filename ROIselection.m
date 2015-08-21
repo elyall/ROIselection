@@ -1907,15 +1907,15 @@ for currentroi = 1:gd.Internal.ROIs.n
             case 'polygon'
                 gd.ROIs.rois.handle = impoly(gd.View.axes,gd.ROIs.rois(currentroi).vertices,'Closed',1);
         end
-        gd.ROIs.rois(currentroi).pixels = createMask(gd.ROIs.rois.handle); % extract mask
+        gd.ROIs.rois(currentroi).pixels = sparse(createMask(gd.ROIs.rois.handle)); % extract mask
         delete(gd.ROIs.rois.handle); % delete temporary UI ROI
     end
     waitbar(currentroi/gd.Internal.ROIs.n,wb);
 end
 close(wb);
 wb = waitbar(0, 'Defining ROI masks');
-gd.ROIs.totalmask = reshape([gd.ROIs.rois(:).pixels], gd.Images.Height, gd.Images.Width, gd.Internal.ROIs.n);
-gd.ROIs.totalmask = sum(gd.ROIs.totalmask, 3);
+gd.ROIs.totalmask = reshape([gd.ROIs.rois(:).pixels], gd.Images.Height*gd.Images.Width, gd.Internal.ROIs.n);
+gd.ROIs.totalmask = reshape(sum(gd.ROIs.totalmask, 2), gd.Images.Height, gd.Images.Width);
 overlapping_regions = gd.ROIs.totalmask > 1;
 gd.ROIs.totalmask = logical(gd.ROIs.totalmask);
 for currentroi = 1:gd.Internal.ROIs.n
@@ -1933,7 +1933,7 @@ function gd = CreateROINeuropilMasks(gd)
 wb = waitbar(0,'Creating Neuropil masks');
 for currentroi = 1:gd.Internal.ROIs.n
     se = strel('square', gd.Internal.Settings.NeuropilDistance);
-    mask = imdilate(gd.ROIs.rois(currentroi).pixels, se) - gd.ROIs.rois(currentroi).pixels;
+    mask = sparse(imdilate(gd.ROIs.rois(currentroi).pixels, se) - gd.ROIs.rois(currentroi).pixels);
     mask = (mask - gd.ROIs.totalmask) > 0;
     if ~isfield(gd.ROIs.rois, 'neuropilmask') || isempty(gd.ROIs.rois(currentroi).neuropilmask) || ~isequal(gd.ROIs.rois(currentroi).neuropilmask, mask) % newly calculated mask or new cell encroached on neuropil
         gd.ROIs.rois(currentroi).neuropilmask = mask;
@@ -1941,8 +1941,8 @@ for currentroi = 1:gd.Internal.ROIs.n
     end
     waitbar(currentroi/gd.Internal.ROIs.n,wb);
 end
-gd.ROIs.totalneuropilmask = reshape([gd.ROIs.rois(:).neuropilmask], gd.Images.Height, gd.Images.Width, gd.Internal.ROIs.n);
-gd.ROIs.totalneuropilmask = logical(sum(gd.ROIs.totalneuropilmask, 3));
+gd.ROIs.totalneuropilmask = reshape([gd.ROIs.rois(:).neuropilmask], gd.Images.Height*gd.Images.Width, gd.Internal.ROIs.n);
+gd.ROIs.totalneuropilmask = reshape(logical(sum(gd.ROIs.totalneuropilmask, 2)), gd.Images.Height, gd.Images.Width);
 guidata(gd.fig, gd);
 close(wb);
 
