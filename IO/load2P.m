@@ -61,7 +61,7 @@ while index<=length(varargin)
             case {'Channels', 'channels', 'Channel', 'channel'}
                 Channels = varargin{index+1};
                 index = index + 2;
-            case {'Depths', 'depths'}
+            case {'Depths', 'depths', 'Depth', 'depth'}
                 Depths = varargin{index+1};
                 index = index + 2;
             case {'Double', 'double'}

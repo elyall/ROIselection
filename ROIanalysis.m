@@ -1,4 +1,4 @@
-function ROIselection(ImageFile, ExperimentFile, ROIFile, varargin)
+function ROIanalysis(ImageFile, ExperimentFile, ROIFile, varargin)
 % ROIANALYSIS Circle ROIs in imaging data as well as and/or create
 % presentable data.
 %
@@ -1721,6 +1721,9 @@ switch current{1}
         gd.Images.Computations.Names = [gd.Images.Computations.Names; 'Average'];
         guidata(hObject, gd);
         set(gd.DataSelection.computation, 'String', gd.Images.Computations.Names);
+        
+    case 'XCorr'
+        
 end
 
 %% VIEWING DATA
