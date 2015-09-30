@@ -62,13 +62,18 @@ if ischar(ROIMasks)
     switch ext
         case '.rois'
             load(ROIFile, 'ROIdata', '-mat');
+            ROIMasks = reshape(full([ROIdata.rois(:).pixels]), size(ROIdata.rois(1).pixels,1), size(ROIdata.rois(1).pixels,2), numel(ROIdata.rois));
         case '.segment'
-            load(ROIFile, 'mask', '-mat');
+            load(ROIFile, 'mask', 'dim', '-mat');
+            if issparse(mask)
+                ROIMasks = reshape(full(mask), dim(1), dim(2), size(mask,2));
+            else
+                ROIMasks = mask;
+            end
     end
-    ROIMasks = reshape([ROIdata.rois(:).pixels], size(ROIdata.rois(1).pixels,1), size(ROIdata.rois(1).pixels,2), numel(ROIdata.rois));
 elseif isstruct(ROIMasks)
     ROIdata = ROIMasks;
-    ROIMasks = reshape([ROIdata.rois(:).pixels], size(ROIdata.rois(1).pixels,1), size(ROIdata.rois(1).pixels,2), numel(ROIdata.rois));
+    ROIMasks = reshape(full([ROIdata.rois(:).pixels]), size(ROIdata.rois(1).pixels,1), size(ROIdata.rois(1).pixels,2), numel(ROIdata.rois));
 end
 [Height, Width, numROIs] = size(ROIMasks);
 
