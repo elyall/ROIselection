@@ -80,6 +80,12 @@ while index<=length(varargin)
     end
 end
 
+% Check LoadType
+if ~any(strcmp(LoadType,{'Direct','MemMap'}))
+    error('Load type ''%s'' not recognized. Load type has to be either ''Direct'' or ''MemMap''', LoadType);
+end
+
+% Update frames to load
 if ischar(Frames) && strcmp(Frames, 'all')
     Frames = [1 inf];
 elseif isnumeric(Frames) && isvector(Frames) && size(Frames,1)~=1

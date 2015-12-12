@@ -69,8 +69,7 @@ switch LoadType
         
         Images = MappedTensor(SbxFile, Config.size, 'Class', Config.Precision);
         Images = permute(Images, [3 2 5 1 4]);
-        % Images = intmax('uint16') - Images; % computation doesn't carry
-        % over
+        % Images = intmax('uint16') - Images; % computation doesn't carry over
         Config.DimensionOrder = Config.DimensionOrder([3 2 5 1 4]);
         Config.size = size(Images);
         % Images = memmapfile(SbxFile,...
