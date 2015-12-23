@@ -1,8 +1,8 @@
 function Filename = save2P(Filename,Images,varargin)
 
-Append = true;
-
-Header = ''; % TIF files only
+Append = false;
+Header = ''; % tif: header, bin: mat-file
+Invert_binary = true; % bin-only: invert colormap before saving
 
 directory = cd;
 
@@ -17,6 +17,9 @@ while index<=length(varargin)
                 index = index + 2;
             case {'Header', 'header'}
                 Header = varargin{index+1};
+                index = index + 2;
+            case 'Invert'
+                Invert_binary = varargin{index+1};
                 index = index + 2;
             otherwise
                 warning('Argument ''%s'' not recognized',varargin{index});
@@ -45,21 +48,11 @@ if ~exist('Images','var') || isempty(Images) % Prompt for file selection
     Images = load2P(Images, 'Type', 'Direct'); % load images
 end
 
-% Check saveType
-if ~any(strcmp(SaveType,{'tif','sbx'}))
-    error('Save type ''%s'' not recognized. Save type has to be either ''tif'' or ''sbx''', SaveType);
-end
-
 % Check format
 if ~isa(Images(1), 'uint16')
     Images = uint16(Images);
 end
-numFrames = size(Images, 5);
-
-% Squeeze images
-if ndims(Images) == 5
-    Images = squeeze(Images(:,:,1,1,:));
-end
+[~,~,numZ,numC,numFrames] = size(Images);
 
 
 %% Save images to file
@@ -68,7 +61,11 @@ end
 [~,~,ext] = fileparts(Filename);
 
 % Save images
-fprintf('Saving %d frames to file: %s...', numFrames, Filename);
+if Append
+    fprintf('Appending\t%d\tframes to file:\t%s...', numFrames, Filename);
+else
+    fprintf('Writing\t%d\tframes to file:\t%s...', numFrames, Filename);
+end
 switch ext
     
     case 'tif'
@@ -81,21 +78,25 @@ switch ext
         end
         
         % Write frames to file
-        for findex=1:numFrames
-            if findex~=1
-                tiffObject.writeDirectory();
+        for dindex = 1:numZ
+            for cindex = 1:numC
+                for findex = 1:numFrames
+                    if findex~=1
+                        tiffObject.writeDirectory();
+                    end
+                    tiffObject.setTag('ImageLength',size(Images,1));
+                    tiffObject.setTag('ImageWidth', size(Images,2));
+                    tiffObject.setTag('Photometric', Tiff.Photometric.MinIsBlack);
+                    tiffObject.setTag('BitsPerSample', 16);
+                    tiffObject.setTag('SamplesPerPixel', 1);
+                    tiffObject.setTag('PlanarConfiguration', Tiff.PlanarConfiguration.Chunky);
+                    tiffObject.setTag('Software', 'MATLAB');
+                    if ~isempty(Header)
+                        tiffObject.setTag('ImageDescription',Header);
+                    end
+                    tiffObject.write(Images(:,:,dindex,cindex,findex));
+                end
             end
-            tiffObject.setTag('ImageLength',size(Images,1));
-            tiffObject.setTag('ImageWidth', size(Images,2));
-            tiffObject.setTag('Photometric', Tiff.Photometric.MinIsBlack);
-            tiffObject.setTag('BitsPerSample', 16);
-            tiffObject.setTag('SamplesPerPixel', 1);
-            tiffObject.setTag('PlanarConfiguration', Tiff.PlanarConfiguration.Chunky);
-            tiffObject.setTag('Software', 'MATLAB');
-            if ~isempty(Header)
-                tiffObject.setTag('ImageDescription',Header);
-            end
-            tiffObject.write(Images(:,:,findex));
         end
         
         % Close file
@@ -110,17 +111,29 @@ switch ext
             fid = fopen(Filename, 'w');
         end
         
-        % Permute frames?
+        % Permute frames
+        Images = permute(Images, [4, 2, 1, 3, 5]); % change to [channel, width, height, depth, frame]
+        
+        % Invert colormap
+        if Invert_binary
+            Images = intmax('uint16') - Images;
+        end
         
         % Write frames to file
-        for findex=1:numFrames
-            fwrite(fid, Images(:,:,findex), 'uint16');
-        end
+        fwrite(fid, Images, 'uint16');
         
         % Close file
         fclose(fid);
         
-end %switch saveType
+        % Save header file
+        if ~isempty(Header)
+            [p,f,~] = fileparts(Filename);
+            HeaderFile = fullfile(p,[f '.mat']);
+            info = Header;
+            save(HeaderFile, 'info', '-mat', '-v7.3');
+        end
+        
+end %switch ext
 
 fprintf('\tComplete\n');
 

@@ -8,14 +8,10 @@ if ~exist('DataFiles', 'var') || isempty(DataFiles)
     [DataFiles,p] = uigetfile({'*.sbx;*.tif;*.imgs'}, 'Choose images file(s) to load', directory, 'MultiSelect', 'on');
     if isnumeric(DataFiles)
         Images = []; return
-    elseif iscellstr(DataFiles)
-        for index = 1:numel(DataFiles)
-            DataFiles{index} = fullfile(p,DataFiles{index});
-        end
-    else
-        DataFiles = {fullfile(p,DataFiles)};
     end
-elseif ~iscell(DataFiles)
+    DataFiles = fullfile(p,DataFiles);
+end
+if ~iscellstr(DataFiles)
     DataFiles = {DataFiles};
 end
 
