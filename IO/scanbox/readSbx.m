@@ -9,6 +9,7 @@ Verbose = true;
 
 % Defaults
 invert = true;
+flipLR = false;
 xavg = 4; %scanbox version 1 only
 
 %% Initialize Parameters
@@ -27,6 +28,9 @@ while index<=length(varargin)
                 index = index + 2;
             case {'Invert', 'invert'}
                 invert = varargin{index+1};
+                index = index + 2;
+            case {'Flip', 'flip'}
+                flipLR = varargin{index+1};
                 index = index + 2;
             case {'Verbose', 'verbose'}
                 Verbose = varargin{index+1};
@@ -147,11 +151,6 @@ switch LoadType
             % Reorder dimensions
             Images = permute(Images, [3 2 5 1 4]); % flip colormap and reorder (original [1,3,2,4] => rotate images)
             
-            % Flip colormap
-            if invert
-                Images = intmax('uint16') - Images;
-            end
-            
             % Correct for nonuniform spatial sampling
             if info.scanbox_version == 1
                 S = sparseint;
@@ -167,6 +166,14 @@ switch LoadType
                 Images = good;
             end
 
+                        % Flip colormap
+            if invert
+                Images = intmax('uint16') - Images;
+            end
+            
+            if flipLR
+                Images = fliplr(Images);
+            end
         else
             warning('unable to open file: %s', SbxFile);
             Images = [];

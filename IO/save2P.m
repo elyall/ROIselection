@@ -68,7 +68,7 @@ else
 end
 switch ext
     
-    case 'tif'
+    case '.tif'
         
         % Open file
         if Append
