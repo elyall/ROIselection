@@ -23,7 +23,9 @@ loadType = 'Direct'; % 'MemMap' or 'Direct'
 saveOut = false; % true or false
 saveFile = ''; % filename to save ROIdata output to (defaults to ROIFile if one is input)
 MotionCorrect = false; % false, filename to load MCdata from, or true to prompt for file selection
+Channel = 1;
 FrameIndex = [1, inf]; % vector of frame indices
+borderLims = [0,0,32,32]; % number of pixels to remove from edges when computing ROI means (top, bottom, left, right)
 
 % Memory settings
 portionOfMemory = 0.08; % find 10% or less works best
@@ -54,6 +56,9 @@ while index<=length(varargin)
                 index = index + 2;
             case {'Frames', 'frames', 'FrameIndex'}
                 FrameIndex = varargin{index+1};
+                index = index + 2;
+            case {'borderLims','Border','border'}
+                borderLims = varargin{index+1};
                 index = index + 2;
             case {'Verbose','verbose'}
                 verbose = true;
@@ -153,6 +158,18 @@ if Depth > 1
     error('Currently does not work for datasets with multiple z-planes');
 end
 
+% Create border
+if any(borderLims)
+    Border = ones(Height,Width);
+    Border(1:borderLims(1),:) = nan;            % top
+    Border(end-borderLims(2)+1:end,:) = nan;    % bottom
+    Border(:,1:borderLims(3)) = nan;            % left
+    Border(:,end-borderLims(4)+1:end) = nan;    % right
+    borderLims = true;
+else
+    borderLims = false;
+end
+
 
 %% Determine ROIs to extract signals for
 if ischar(ROIindex)
@@ -173,6 +190,7 @@ if numROIs == 0
     Neuropil = [];
     return
 end
+
 
 %% Determine frames to process
 if FrameIndex(end)==inf
@@ -226,7 +244,12 @@ switch Mode
                 if bindex ~= 1
                     fprintf('\n');
                 end
-                [Images, loadObj] = load2P(ImageFiles, 'Type', 'Direct', 'Frames', currentFrames);
+                [Images, loadObj] = load2P(ImageFiles, 'Type', 'Direct', 'Frames', currentFrames, 'Channel', Channel);
+            end
+            
+            % Remove border pixels
+            if borderLims
+                Images = bsxfun(@times, Images, Border);
             end
             
             % Correct for motion
@@ -265,20 +288,25 @@ switch Mode
         end
         
         % Cycle through frames
-        parfor findex = FrameIndex
+        for findex = FrameIndex
             
             % Load Frame
-            [img, loadObj] = load2P(ImageFiles, 'Type', 'Direct', 'Frames', findex, 'Verbose', false); %direct
+            [img, loadObj] = load2P(ImageFiles, 'Type', 'Direct', 'Frames', findex, 'Channel', Channel, 'Verbose', false, 'double'); %direct
+            
+            % Remove border pixels
+            if borderLims
+                img = img.*Border;
+            end
             
             % Correct for motion
             if MotionCorrect
                 img = applyMotionCorrection(img, MCdata, loadObj);
-            end
+            end            
             
             % Calculate fluorescence signal
             for rindex = 1:numROIs
-                Data(rindex,findex) = mean(img(DataMasks{rindex}));
-                Neuropil(rindex,findex) = mean(img(NeuropilMasks{rindex}));
+                Data(rindex,findex) = nanmean(img(DataMasks{rindex}));
+                Neuropil(rindex,findex) = nanmean(img(NeuropilMasks{rindex}));
                 % Neuropil(rindex,findex) = trimmean(img(NeuropilMasks{rindex}), 10); % sbx method
             end
             
@@ -306,7 +334,12 @@ switch Mode
         parfor findex = FrameIndex
             
             % Load Frame
-            [img, loadObj] = load2P(ImageFiles, 'Type', 'Direct', 'Frames', findex, 'Verbose', false, 'double'); %direct
+            [img, loadObj] = load2P(ImageFiles, 'Type', 'Direct', 'Frames', findex, 'Channel', Channel, 'Verbose', false, 'double'); %direct
+            
+            % Remove border pixels
+            if borderLims
+                img = img.*Border;
+            end
             
             % Correct for motion
             if MotionCorrect
@@ -314,8 +347,8 @@ switch Mode
             end
             
             % Calculate fluorescence signal
-            Data(:,findex) = full(sum(bsxfun(@times, DataMasks, img)))./numPixelsData;
-            Neuropil(:,findex) = full(sum(bsxfun(@times, DataMasks, img)))./numPixelsNeuropil;
+            Data(:,findex) = full(nansum(bsxfun(@times, DataMasks, img)))./numPixelsData;
+            Neuropil(:,findex) = full(nansum(bsxfun(@times, DataMasks, img)))./numPixelsNeuropil;
             
             if verbose
                 parfor_progress; % Update status
