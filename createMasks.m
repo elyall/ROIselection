@@ -1,15 +1,17 @@
-function [ROIMasks, NeuropilMasks, countMatrix] = createMasks(ROIMasks, varargin)
+function [ROIMasks, NeuropilMasks, ROIdata] = createMasks(ROIMasks, varargin)
 
-NeuropilSE = strel('disk', 5); % structuring element for creating neuropil masks' outer diameter during dilation step
-BorderSE = strel('disk', 2); % strucutring element for creating neuropil masks' inner diameter (border region)
+neuropiltype = 'dilation'; % 'sbx' or 'dilation'
+ROIdata = [];
 
+% Dilation only
+NeuropilNum = 9;  % structuring element for creating neuropil masks' outer diameter during dilation step
+BorderNum = 4;    % strucutring element for creating neuropil masks' inner diameter (border region)
 
 % saving variables
 ROIindex = [1 inf];
 override = false;
 saveOut = false;
 saveFile = '';
-
 
 directory = cd;
 
@@ -18,11 +20,17 @@ index = 1;
 while index<=length(varargin)
     try
         switch varargin{index}
-            case 'NeuropilSE'
-                NeuropilSE = varargin{index+1};
+            case 'ROIdata'
+                ROIdata = varargin{index+1};
                 index = index + 2;
-            case 'BorderSE'
-                BorderSE = varargin{index+1};
+            case 'type'
+                neuropiltype = varargin{index+1};
+                index = index + 2;
+            case 'NeuropilNum'
+                NeuropilNum = varargin{index+1};
+                index = index + 2;
+            case 'BorderNum'
+                BorderNum = varargin{index+1};
                 index = index + 2;
             case 'ROIindex'
                 ROIindex = varargin{index+1};
@@ -75,7 +83,7 @@ elseif isstruct(ROIMasks)
     ROIdata = ROIMasks;
     ROIMasks = reshape(full([ROIdata.rois(:).pixels]), size(ROIdata.rois(1).pixels,1), size(ROIdata.rois(1).pixels,2), numel(ROIdata.rois));
 end
-[Height, Width, numROIs] = size(ROIMasks);
+[H, W, numROIs] = size(ROIMasks);
 
 
 %% Determine ROIs to compute masks for
@@ -94,30 +102,48 @@ ROIMasks(repmat(overlap, 1, 1, numROIs)) = 0;      % remove regions of overlap f
 
 
 %% Create neuropil masks
-% if isempty(BorderSE)
-%     NeuropilMasks = imdilate(ROIMasks, NeuropilSE) - ROIMasks;                          % do not create a buffer region
-% else
-%     NeuropilMasks = imdilate(ROIMasks, NeuropilSE) - imdilate(ROIMasks, BorderSE);      % place buffer region between neuropil mask and ROI mask
-% end
-% 
-% % Remove neighboring ROIs from neuropil masks
-% NeuropilMasks(repmat(logical(countMatrix), 1, 1, numROIs)) = 0;
-
-
-% SBX method
-g = exp(-(-10:10).^2/2/2^2);
-maskb = conv2(g,g,double(logical(countMatrix)),'same')>.15; %.02                        % dilation for border region around ROIs
-[xi,yi] = meshgrid(1:796,1:512);
-centroids = reshape([ROIdata.rois(ROIindex).centroid], 2, numROIs)';
-for rindex = 1:numROIs
-    for neuropilrad = 40:5:100
-        M = (xi-centroids(rindex,1)).^2+(yi-centroids(rindex,2)).^2 < neuropilrad^2;    % mask of pixels within the radius
-        NeuropilMasks(:,:,rindex) = M.*~maskb;                                          % remove ROIs and border regions
-        if nnz(NeuropilMasks(:,:,rindex)) > 4000
-            break
+fprintf('Creating ROI & Neuropil masks...\n');
+countMatrix = logical(countMatrix);
+NeuropilMasks = false(H,W,numROIs);
+switch neuropiltype
+    case 'dilation'
+        
+        numPixels = 2*prctile(sum(reshape(ROIMasks,H*W,numROIs)),95);
+        if ~isempty(BorderNum)
+            mask = imdilate(countMatrix, strel('disk',BorderNum));
+        else
+            mask = countmatrix;
         end
-    end
-end
+        parfor_progress(numROIs);
+        parfor rindex = 1:numROIs
+            index = 0;
+            while nnz(NeuropilMasks(:,:,rindex)) < numPixels
+                NeuropilMasks(:,:,rindex) = imdilate(ROIMasks(:,:,rindex), strel('disk',NeuropilNum+index));
+                NeuropilMasks(:,:,rindex) = NeuropilMasks(:,:,rindex).*~mask;
+                index = index + 1;
+            end
+            parfor_progress;
+        end
+        parfor_progress(0);
+
+    case 'sbx' % SBX method
+        
+        g = exp(-(-10:10).^2/2/2^2);
+        maskb = conv2(g,g,double(countMatrix),'same')>.15; %.02                        % dilation for border region around ROIs (.15 -> 3 pixels)
+        [xi,yi] = meshgrid(1:W,1:H);
+        centroids = reshape([ROIdata.rois(ROIindex).centroid], 2, numROIs)';
+        for rindex = 1:numROIs
+            for neuropilrad = 40:5:100
+                M = (xi-centroids(rindex,1)).^2+(yi-centroids(rindex,2)).^2 < neuropilrad^2;    % mask of pixels within the radius from the centroid (circle)
+                NeuropilMasks(:,:,rindex) = M.*~maskb;                                          % remove ROIs and border regions
+                if nnz(NeuropilMasks(:,:,rindex)) > 4000
+                    break
+                end
+            end
+        end
+
+end %switch neuropiltype
+fprintf('Complete\n');
 
 
 %% Select a subsampling of neuropil pixels to ensure an equal signal to noise
@@ -128,17 +154,13 @@ end
 %     indices = sub2ind([Height, Width, numROIs], subset(:,1), subset(:,2), repmat(rindex, DiffinPixels(rindex), 1));
 %     NeuropilMasks(indices) = 0;
 % end
+        
 
-
-%% Save output
-if saveOut
-    if isempty(saveFile) || ~ischar(saveFile)
-        warning('Did not save output to file because file to save to is not specified.');
-        return
-    end
-    if ~exist('ROIdata', 'var')
+%% Distribute to structure
+if nargin > 2 || (saveOut && ~isempty(saveFile))
+    if isempty(ROIdata)
         load(saveFile, 'ROIdata', '-mat')
-        if ~exist('ROIdata', 'var')
+        if isempty(ROIdata)
             warning('Did not save output to file because initial ROIdata not given.');
             return
         end
@@ -155,8 +177,11 @@ if saveOut
             ROIdata.rois(ROIindex(rindex)).neuropilmask = sparse(NeuropilMasks(:,:,rindex));
         end
     end
-    
-    % Save to file
+end
+
+
+%% Save output
+if saveOut && ~isempty(saveFile)
     if ~exist(saveFile, 'file')
         save(saveFile, 'ROIdata', '-mat', '-v7.3');
     else

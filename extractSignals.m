@@ -18,18 +18,18 @@ function [ROIdata, Data, Neuropil, ROIindex] = extractSignals(Images, ROIdata, R
 % previous designated frame (ex: default is [1, inf] specifying all
 % frames).
 
-Mode = 'Cell'; % 'GPU', 'Cell', 'Sparse'
-loadType = 'Direct'; % 'MemMap' or 'Direct'
-saveOut = false; % true or false
-saveFile = ''; % filename to save ROIdata output to (defaults to ROIFile if one is input)
-MotionCorrect = false; % false, filename to load MCdata from, or true to prompt for file selection
-Channel = 1;
-FrameIndex = [1, inf]; % vector of frame indices
-borderLims = [0,0,32,32]; % number of pixels to remove from edges when computing ROI means (top, bottom, left, right)
+Mode = 'Cell';              % 'GPU', 'Cell', 'Sparse'
+loadType = 'Direct';        % 'MemMap' or 'Direct'
+saveOut = false;            % true or false
+saveFile = '';              % filename to save ROIdata output to (defaults to ROIFile if one is input)
+MotionCorrect = false;      % false, filename to load MCdata from, or true to prompt for file selection
+Channel = 1;                % channel to extract data from
+FrameIndex = [1, inf];      % vector of frame indices
+borderLims = [0,0,32,32];   % number of pixels to remove from edges when computing ROI means (top, bottom, left, right)
 
 % Memory settings
-portionOfMemory = 0.08; % find 10% or less works best
-sizeRAM = 32000000000; % amount of memory on your computer (UNIX-only)
+portionOfMemory = 0.08;     % find 10% or less works best
+sizeRAM = 32000000000;      % amount of memory on your computer (UNIX-only)
 
 verbose = false;
 directory = cd;
@@ -39,20 +39,23 @@ index = 1;
 while index<=length(varargin)
     try
         switch varargin{index}
-            case {'Save', 'save'}
-                saveOut = true;
-                index = index + 1;
-            case {'SaveFile', 'saveFile'}
-                saveFile = varargin{index+1};
-                index = index + 2;
             case 'Mode'
                 Mode = varargin{index+1};
                 index = index + 2;
             case 'loadType'
                 loadType = varargin{index+1};
                 index = index + 2;
+            case {'Save', 'save'}
+                saveOut = true;
+                index = index + 1;
+            case {'SaveFile', 'saveFile'}
+                saveFile = varargin{index+1};
+                index = index + 2;
             case 'MotionCorrect'
                 MotionCorrect = varargin{index+1};
+                index = index + 2;
+            case 'Channel'
+                Channel = varargin{index+1};
                 index = index + 2;
             case {'Frames', 'frames', 'FrameIndex'}
                 FrameIndex = varargin{index+1};
@@ -291,7 +294,7 @@ switch Mode
         parfor findex = FrameIndex
             
             % Load Frame
-            [img, loadObj] = load2P(ImageFiles, 'Type', 'Direct', 'Frames', findex, 'Channel', Channel, 'Verbose', false, 'double'); %direct
+            [img, loadObj] = load2P(ImageFiles, 'Type', 'Direct', 'Frames', findex, 'Channel', Channel, false, 'double'); %direct
             
             % Remove border pixels
             if borderLims
