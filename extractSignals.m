@@ -25,7 +25,7 @@ saveFile = '';              % filename to save ROIdata output to (defaults to RO
 MotionCorrect = false;      % false, filename to load MCdata from, or true to prompt for file selection
 Channel = 1;                % channel to extract data from
 FrameIndex = [1, inf];      % vector of frame indices
-borderLims = [0,0,32,32];   % number of pixels to remove from edges when computing ROI means (top, bottom, left, right)
+borderLims = [0,0,34,34];   % number of pixels to remove from edges when computing ROI means (top, bottom, left, right)
 
 % Memory settings
 portionOfMemory = 0.08;     % find 10% or less works best
@@ -294,7 +294,7 @@ switch Mode
         parfor findex = FrameIndex
             
             % Load Frame
-            [img, loadObj] = load2P(ImageFiles, 'Type', 'Direct', 'Frames', findex, 'Channel', Channel, false, 'double'); %direct
+            [img, loadObj] = load2P(ImageFiles, 'Type', 'Direct', 'Frames', findex, 'Channel', Channel, 'Verbose', false, 'double'); %direct
             
             % Remove border pixels
             if borderLims
@@ -368,6 +368,9 @@ fprintf('\nFinished extracting signals for %d ROI(s) from %d frame(s)\nSession t
 
 %% Distribute data to structure
 for rindex = 1:numROIs
+    if ~isfield(ROIdata.rois(1),'rawdata');
+        ROIdata.rois(1).rawdata = [];
+    end
     if isempty(ROIdata.rois(ROIindex(rindex)).rawdata) % replace whole vector
         ROIdata.rois(ROIindex(rindex)).rawdata = Data(rindex, :);
         ROIdata.rois(ROIindex(rindex)).rawneuropil = Neuropil(rindex, :);

@@ -13,6 +13,7 @@ override = false;
 saveOut = false;
 saveFile = '';
 
+verbose = false;
 directory = cd;
 
 %% Parse input arguments
@@ -41,6 +42,9 @@ while index<=length(varargin)
             case {'SaveFile', 'saveFile'}
                 saveFile = varargin{index+1};
                 index = index + 2;
+            case {'Verbose','verbose'}
+                verbose = true;
+                index = index + 1;
             otherwise
                 warning('Argument ''%s'' not recognized',varargin{index});
                 index = index + 1;
@@ -114,7 +118,7 @@ switch neuropiltype
         else
             mask = countmatrix;
         end
-        parfor_progress(numROIs);
+        if verbose; parfor_progress(numROIs); end;
         parfor rindex = 1:numROIs
             index = 0;
             while nnz(NeuropilMasks(:,:,rindex)) < numPixels
@@ -122,9 +126,9 @@ switch neuropiltype
                 NeuropilMasks(:,:,rindex) = NeuropilMasks(:,:,rindex).*~mask;
                 index = index + 1;
             end
-            parfor_progress;
+            if verbose; parfor_progress; end
         end
-        parfor_progress(0);
+        if verbose; parfor_progress(0); end
 
     case 'sbx' % SBX method
         
@@ -157,7 +161,7 @@ fprintf('Complete\n');
         
 
 %% Distribute to structure
-if nargin > 2 || (saveOut && ~isempty(saveFile))
+if nargout > 2 || (saveOut && ~isempty(saveFile))
     if isempty(ROIdata)
         load(saveFile, 'ROIdata', '-mat')
         if isempty(ROIdata)
