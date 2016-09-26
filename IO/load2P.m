@@ -23,7 +23,7 @@ Frames = [1, inf]; % indices of frames to load in 'Direct' mode, or 'all'
 Channels = inf;
 Double = false;
 SaveToMat = false;
-Verbose = true;
+Verbose = false;
 
 %% Initialize Parameters
 if ~exist('ImageFiles', 'var') || isempty(ImageFiles)
@@ -68,8 +68,8 @@ while index<=length(varargin)
                 Double = true;
                 index = index + 1;
             case {'Verbose', 'verbose'}
-                Verbose = varargin{index+1};
-                index = index + 2;
+                Verbose = ~Verbose;
+                index = index + 1;
             otherwise
                 warning('Argument ''%s'' not recognized',varargin{index});
                 index = index + 1;
