@@ -45,7 +45,12 @@ if ~exist('Images','var') || isempty(Images) % Prompt for file selection
         return
     end
     Images = fullfile(directory,Images);
-    Images = load2P(Images, 'Type', 'Direct'); % load images
+end
+
+
+%% Load images
+if ischar(Images)
+    Images = load2P(Images, 'Type', 'Direct', 'Frames', 2:501); % load images
 end
 
 % Check format
