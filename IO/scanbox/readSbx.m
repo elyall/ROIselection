@@ -5,6 +5,7 @@ function [Images, Config, InfoFile] = readSbx(SbxFile, InfoFile, varargin)
 LoadType = 'Direct'; % 'MemMap' or 'Direct'
 Frames = 1:20; % indices of frames to load in 'Direct' mode, or 'all'
 Channels = 1;
+Depths = inf;
 Verbose = true;
 
 % Defaults
@@ -25,6 +26,9 @@ while index<=length(varargin)
                 index = index + 2;
             case {'Channels','channels'}
                 Channels = varargin{index+1};
+                index = index + 2;
+            case {'Depths', 'depths', 'Depth', 'depth'}
+                Depths = varargin{index+1};
                 index = index + 2;
             case {'Invert', 'invert'}
                 invert = varargin{index+1};
@@ -85,26 +89,34 @@ switch LoadType
         
         % Determine frames to load
         if ischar(Frames) || (numel(Frames)==1 && Frames == inf)
-            Frames = 1:info.numFrames;
+            Frames = 1:Config.Frames;
         elseif Frames(end) == inf
-            Frames = [Frames(1:end-2),Frames(end-1):info.numFrames];
+            Frames = [Frames(1:end-2),Frames(end-1):Config.Frames];
         end
         numFramesToLoad = numel(Frames);
         Frames = Frames - 1; % offset b/c of "0" indexing
         
         % Determine channels to load
         if ischar(Channels) || (numel(Channels)==1 && Channels == inf)
-            Channels = 1:info.numChannels;
+            Channels = 1:Config.Channels;
         elseif Channels(end) == inf
-            Channels = [Channels(1:end-2),Channels(end-1):info.numChannels];
+            Channels = [Channels(1:end-2),Channels(end-1):Config.Channels];
         end
         numChannelsBeingRead = numel(Channels);
         
+        % Determine depths to load
+        if ischar(Depths) || (numel(Depths)==1 && Depths == inf)
+            Depths = 1:Config.Depth;
+        elseif Depths(end) == inf;
+            Depths = [Depths(1:end-2),Depths(end-1):Config.Depth];
+        end
+        numDepths = numel(Depths);
+        
         % Preallocate output
         if info.scanbox_version == 1
-            Images = zeros(numChannelsBeingRead, Config.Width/xavg, Config.Height, numFramesToLoad, 'uint16');
+            Images = zeros(numChannelsBeingRead, Config.Width/xavg, Config.Height, numDepths, numFramesToLoad, 'uint16');
         elseif info.scanbox_version == 2
-            Images = zeros(numChannelsBeingRead, Config.Width, Config.Height, numFramesToLoad, 'uint16');
+            Images = zeros(numChannelsBeingRead, Config.Width, Config.Height, numDepths, numFramesToLoad, 'uint16');
         end
 
         
@@ -128,15 +140,15 @@ switch LoadType
             end
             
             for index = 1:length(seekoperations)
-                if(fseek(info.fid, Config.Height * Config.Width * 2 * Frames(seekoperations(index)) * Config.Channels, 'bof')==0) % "2" b/c assumes uint16 => 2 bytes per record
-                    temp = fread(info.fid, Config.Height * Config.Width * Config.Channels * numframesperread(index), 'uint16=>uint16');
+                if(fseek(info.fid, Config.Height * Config.Width * Config.Depth * 2 * Frames(seekoperations(index)) * Config.Channels, 'bof')==0) % "2" b/c assumes uint16 => 2 bytes per record
+                    temp = fread(info.fid, Config.Height * Config.Width * Config.Depth * Config.Channels * numframesperread(index), 'uint16=>uint16');
                     if info.scanbox_version == 1 % downsample/averaging
-                        temp = mean(reshape(temp,[Config.Channels xavg Config.Width/xavg Config.Height numframesperread(index)]), 2);
-                        temp = reshape(temp,[Config.numChannels Config.Width/xavg Config.Height numframesperread(index)]);
+                        temp = mean(reshape(temp,[Config.Channels xavg Config.Width/xavg Config.Height Config.Depth numframesperread(index)]), 2);
+                        temp = reshape(temp,[Config.numChannels Config.Width/xavg Config.Height Config.Depth numframesperread(index)]);
                     elseif info.scanbox_version == 2
-                        temp = reshape(temp,[Config.Channels Config.Width Config.Height numframesperread(index)]);
+                        temp = reshape(temp,[Config.Channels Config.Width Config.Height Config.Depth numframesperread(index)]);
                     end
-                    Images(:,:,:,seekoperations(index):seekoperations(index)+numframesperread(index)-1) = temp(Channels,:,:,:); % save only requested channels
+                    Images(:,:,:,:,seekoperations(index):seekoperations(index)+numframesperread(index)-1) = temp(Channels,:,:,Depths,:); % save only requested channels & depths
                 else
                     warning('fseek error...');
                     Images = [];
@@ -149,7 +161,7 @@ switch LoadType
             end
             
             % Reorder dimensions
-            Images = permute(Images, [3 2 5 1 4]); % flip colormap and reorder (original [1,3,2,4] => rotate images)
+            Images = permute(Images, [3 2 4 1 5]); % flip colormap and reorder (original [1,3,2,4] => rotate images)
             
             % Correct for nonuniform spatial sampling
             if info.scanbox_version == 1
@@ -166,7 +178,7 @@ switch LoadType
                 Images = good;
             end
 
-                        % Flip colormap
+            % Flip colormap
             if invert
                 Images = intmax('uint16') - Images;
             end
@@ -180,7 +192,7 @@ switch LoadType
         end
         fclose(info.fid);
         
-        Config.DimensionOrder = Config.DimensionOrder([3 2 5 1 4]);
+        Config.DimensionOrder = Config.DimensionOrder([3 2 4 1 5]);
         
         Config.size = size(Images);
         

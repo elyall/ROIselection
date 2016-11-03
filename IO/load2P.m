@@ -21,13 +21,14 @@ function [Images, loadObj, Config] = load2P(ImageFiles, varargin)
 LoadType = 'Direct'; % 'MemMap' or 'Direct' or 'Buffered' 
 Frames = [1, inf]; % indices of frames to load in 'Direct' mode, or 'all'
 Channels = inf;
+Depths = inf;
 Double = false;
 SaveToMat = false;
 Verbose = false;
+directory = cd;
 
 %% Initialize Parameters
 if ~exist('ImageFiles', 'var') || isempty(ImageFiles)
-    directory = CanalSettings('DataDirectory');
     [ImageFiles,p] = uigetfile({'*.sbx;*.tif;*.imgs'}, 'Choose images file(s) to load', directory, 'MultiSelect', 'on');
     if isnumeric(ImageFiles)
         Images = []; return
@@ -173,13 +174,19 @@ switch LoadType
         % Determine Channels to Load (FILES ALL MUST HAVE DESIRED CHANNEL
         % OR WILL ERROR)
         if ischar(Channels) || (numel(Channels)==1 && Channels == inf)
-            Channels = 1:min([Config(:).Channels]); % load all channels (based on file with minimum # of frames)
+            Channels = 1:min([Config(:).Channels]); % load all channels (based on file with minimum # of channels)
         elseif Channels(end) == inf
             Channels = [Channels(1:end-2),Channels(end-1):min([Config(:).Channels])];
         end
         
+        if ischar(Depths) || (numel(Depths)==1 && Depths == inf)
+            Depths = 1:min([Config(:).Depth]); % load all channels (based on file with minimum # of depths)
+        elseif Depths(end) == inf
+            Depths = [Depths(1:end-2),Depths(end-1):min([Config(:).Depths])];
+        end
+        
         % Load Images
-        Images = zeros(Config(1).Height, Config(1).Width, Config(1).Depth, numel(Channels), sum(numFrames), 'uint16');
+        Images = zeros(Config(1).Height, Config(1).Width, numel(Depths), numel(Channels), sum(numFrames), 'uint16');
         startFrame = cumsum([1,numFrames(1:end-1)]);
         for index = 1:numFiles
             [~,~,loadObj.files(index).ext] = fileparts(ImageFiles{index});
@@ -187,7 +194,7 @@ switch LoadType
                 switch loadObj.files(index).ext
                     case '.sbx'
                         Images(:,:,:,:,startFrame(index):startFrame(index)+numFrames(index)-1)...
-                            = readSbx(ImageFiles{index}, [], 'Type', 'Direct', 'Frames', FrameIndex{index}, 'Channels', Channels, 'Verbose', Verbose);
+                            = readSbx(ImageFiles{index}, [], 'Type', 'Direct', 'Frames', FrameIndex{index}, 'Channels', Channels, 'Depth', Depths, 'Verbose', Verbose);
                     case '.tif'
                         Images(:,:,:,:,startFrame(index):startFrame(index)+numFrames(index)-1)...
                             = readScim(ImageFiles{index}, 'Frames', FrameIndex{index}, 'Channels', Channels, 'Verbose', Verbose);

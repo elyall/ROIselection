@@ -94,14 +94,21 @@ if info.scanbox_version>=2
 else
     config.FrameRate = 15.45;
 end
-            
+
+% Determine depth
+if ~isfield(info,'otwave') || isempty(info.otwave)
+    config.Depth = 1;
+    config.ZStepSize = 0;
+else
+    config.Depth = numel(info.otwave_um);
+    config.ZStepSize = info.otwave_um;
+end
+
+
 %% DEFAULTS
-% config.Processing = {};
-% config.info = [];
-% config.MotionCorrected = false;
-config.Depth = 1; % current default
-config.ZStepSize = 0; % current default
 config.Precision = 'uint16'; % default
-config.DimensionOrder = {'Channels','Width','Height','Frames','Depth'}; % default
+config.DimensionOrder = {'Channels','Width','Height','Depth','Frames'}; % default
 config.Colors = {'green', 'red'};
 config.size = [config.Height, config.Width, config.Depth, config.Channels, config.Frames];
+
+
