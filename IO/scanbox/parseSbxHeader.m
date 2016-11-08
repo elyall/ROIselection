@@ -3,11 +3,11 @@ function config = parseSbxHeader(File)
 % an empty matrix to initiate file selection from the default directory
 
 % config.version = 1;
+directory = cd;
 
 %% Check input arguments
 narginchk(0,1);
 if ~exist('File', 'var') || isempty(File)
-    directory = loadCanalSettings('DataDirectory');
     [File, p] = uigetfile({'.sbx;.mat'}, 'Choose sbx file', directory);
     if isnumeric(File)
         return
@@ -96,7 +96,7 @@ else
 end
 
 % Determine depth
-if ~isfield(info,'otwave') || isempty(info.otwave)
+if ~isfield(info,'otwave') || isempty(info.otwave) || ~info.volscan
     config.Depth = 1;
     config.ZStepSize = 0;
 else
