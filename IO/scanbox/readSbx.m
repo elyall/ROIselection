@@ -9,9 +9,10 @@ Depths = inf;
 Verbose = true;
 
 % Defaults
-invert = true;
-flipLR = false;
-xavg = 4; %scanbox version 1 only
+invert = true;      % invert colormap boolean
+FramesPerDepth = 1; % number of frames acquired at each depth before moving to next depth
+flipLR = false;     % flip images across vertical axis
+xavg = 4;           % number of pixels to average for each pixel (scanbox version 1 only)
 
 %% Initialize Parameters
 index = 1;
@@ -87,14 +88,20 @@ switch LoadType
         
     case {'Direct', 'direct'}
         
+        % Determine encoding
+        switch Config.Precision
+            case 'uint16'
+                BytesPerPixel = 2;
+        end
+        PixelsPerFrame = Config.Height*Config.Width;
+        
         % Determine frames to load
         if ischar(Frames) || (numel(Frames)==1 && Frames == inf)
             Frames = 1:Config.Frames;
         elseif Frames(end) == inf
             Frames = [Frames(1:end-2),Frames(end-1):Config.Frames];
         end
-        numFramesToLoad = numel(Frames);
-        Frames = Frames - 1; % offset b/c of "0" indexing
+        numFrames = numel(Frames);
         
         % Determine channels to load
         if ischar(Channels) || (numel(Channels)==1 && Channels == inf)
@@ -102,7 +109,7 @@ switch LoadType
         elseif Channels(end) == inf
             Channels = [Channels(1:end-2),Channels(end-1):Config.Channels];
         end
-        numChannelsBeingRead = numel(Channels);
+        numChannels = numel(Channels);
         
         % Determine depths to load
         if ischar(Depths) || (numel(Depths)==1 && Depths == inf)
@@ -112,21 +119,39 @@ switch LoadType
         end
         numDepths = numel(Depths);
         
-        % Preallocate output
-        if info.scanbox_version == 1
-            Images = zeros(numChannelsBeingRead, Config.Width/xavg, Config.Height, numDepths, numFramesToLoad, 'uint16');
-        elseif info.scanbox_version == 2
-            Images = zeros(numChannelsBeingRead, Config.Width, Config.Height, numDepths, numFramesToLoad, 'uint16');
-        end
+        % Determine indices within file to load
+        PacketSize = FramesPerDepth * numDepths;
+        F = reshape(1:PacketSize,FramesPerDepth,numDepths);
+        Findex = rem(Frames-1,FramesPerDepth)+1;
+        Frames = bsxfun(@plus, floor(Frames/numDepths)',F(Findex,:)); % STILL WRONG for 
+        
+        
+        Frames = Frames-1; % offset b/c of "0" indexing when loading
 
         
+        
+        if rem(numFrames,FramesPerDepth)~=0
+            Frames = [Frames,nan(1,FramesPerDepth-rem(numFrames,FramesPerDepth))];
+        end
+        Frames = reshape(Frames, FramesPerDepth, ceil(numFrames/FramesPerDepth));
+        Frames = repmat(Frames, [1,1,FramesPerDepth]);
+        Frames = bsxfun(@plus, repmat(temp',1,1,FramesPerDepth)*Config.Depth, 1:FramesPerDepth:Config.Depth*FramesPerDepth);
+        Frames = bsxfun(@plus, Frames, permute(0:FramesPerDepth-1,[1,3,2]));
+        
+        % Preallocate output
+        if info.scanbox_version ~= 1
+            Images = zeros(numChannels*PixelsPerFrame*FramesPerDepth*numDepths*floor(numFrames/FramesPerDepth), 'uint16');
+        else % version 1
+            Images = zeros(numChannels,Config.Width/xavg,Config.Height,numDepths,numFrames, 'uint16');
+        end
+
         % Determine number and location of seek operations due to non-contiguous frame requests (jumps)
         seekoperations = find(diff(Frames)~=1); %find any jumps within the frames to read out (jumps requiring seeking)
         if isempty(seekoperations) %no jumps
-            numframesperread = numFramesToLoad; %all frames will be read in one read
+            numframesperread = numFrames; %all frames will be read in one read
             seekoperations = 1; %only one seek operation to first frame of FrameIndex
         else
-            numframesperread = diff([0,seekoperations,numFramesToLoad]); %multiple reads required with various numbers of frames per read
+            numframesperread = diff([0,seekoperations,numFrames]); %multiple reads required with various numbers of frames per read
             seekoperations = [1,seekoperations+1]; %indexes the first frame of each read within FrameIndex
         end
         
@@ -136,23 +161,34 @@ switch LoadType
             
             % Load Images
             if Verbose
-                fprintf('Loading\t%d\tframe(s) from\t%s...', numel(Frames), SbxFile);
+                fprintf('Loading\t%d\tframe(s) from\t%s...', numFrames, SbxFile);
             end
             
+            % Cycle through loading in frames
             for index = 1:length(seekoperations)
-                if(fseek(info.fid, Config.Height * Config.Width * Config.Depth * 2 * Frames(seekoperations(index)) * Config.Channels, 'bof')==0) % "2" b/c assumes uint16 => 2 bytes per record
-                    temp = fread(info.fid, Config.Height * Config.Width * Config.Depth * Config.Channels * numframesperread(index), 'uint16=>uint16');
-                    if info.scanbox_version == 1 % downsample/averaging
+                if(fseek(info.fid, PixelsPerFrame * BytesPerPixel * Config.Depth * Config.Channels * Frames(seekoperations(index)), 'bof')==0)
+                    if info.scanbox_version ~= 1
+                        Images(seekoperations(index):seekoperations(index)+numframesperread(index)-1) = fread(info.fid, PixelsPerFrame * Config.Depth * Config.Channels * numframesperread(index), 'uint16=>uint16');
+                    else % downsample/averaging
+                        temp = fread(info.fid, PixelsPerFrame * Config.Depth * Config.Channels * numframesperread(index), 'uint16=>uint16');
                         temp = mean(reshape(temp,[Config.Channels xavg Config.Width/xavg Config.Height Config.Depth numframesperread(index)]), 2);
                         temp = reshape(temp,[Config.numChannels Config.Width/xavg Config.Height Config.Depth numframesperread(index)]);
-                    elseif info.scanbox_version == 2
-                        temp = reshape(temp,[Config.Channels Config.Width Config.Height Config.Depth numframesperread(index)]);
+                        Images(:,:,:,:,seekoperations(index):seekoperations(index)+numframesperread(index)-1) = temp(Channels,:,:,Depths,:); % save only requested channels & depths
                     end
-                    Images(:,:,:,:,seekoperations(index):seekoperations(index)+numframesperread(index)-1) = temp(Channels,:,:,Depths,:); % save only requested channels & depths
                 else
                     warning('fseek error...');
                     Images = [];
                 end
+            end
+            
+            % Reshape images & keep only desired channels
+            if info.scanbox_version ~= 1
+                if FramesPerDepth == 1
+                    Images = reshape(Images,numChannels,Config.Width,Config.Height,numDepths,numFrames); % reshape vector to usable format
+                else
+                    Images = reshape(Images,numChannels,Config.Width,Config.Height,FramesPerDepth,numDepths,floor(numFrames/FramesPerDepth)); % reshape vector to usable format
+                end
+                Images = Images(Channels,:,:,:,:); % keep only requested channels
             end
             
             % Update dimensions (v.1 only)
@@ -167,8 +203,8 @@ switch LoadType
             if info.scanbox_version == 1
                 S = sparseint;
                 info.Width = size(S,2);
-                good = zeros(Config.Height, Config.Width, 1, numChannelsBeingRead, Config.Frames);
-                for ii = 1:numChannelsBeingRead
+                good = zeros(Config.Height, Config.Width, 1, numChannels, Config.Frames);
+                for ii = 1:numChannels
                     for iii = 1:1
                         for iiii = 1:Config.Frames
                             good(:,:,iii,ii,iiii) = Images(:,:,iii,ii,iiii) * S; % correct for non-uniform sampling
@@ -186,6 +222,7 @@ switch LoadType
             if flipLR
                 Images = fliplr(Images);
             end
+            
         else
             warning('unable to open file: %s', SbxFile);
             Images = [];
