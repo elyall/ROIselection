@@ -73,6 +73,15 @@ switch info.channels
         config.Channels = 1;      % PMT 1
 end
 
+% Determine # of depths
+if ~isfield(info,'otwave') || isempty(info.otwave) || ~info.volscan
+    config.Depth = 1;
+    config.ZStepSize = 0;
+else
+    config.Depth = numel(info.otwave_um);
+    config.ZStepSize = info.otwave_um;
+end
+
 % Determine # of frames
 d = dir(SbxFile);
 config.Frames =  d.bytes/(config.Height*config.Width*config.Channels*2); % "2" b/c assumes uint16 encoding => 2 bytes per sample
@@ -93,15 +102,6 @@ if info.scanbox_version>=2
     end
 else
     config.FrameRate = 15.45;
-end
-
-% Determine depth
-if ~isfield(info,'otwave') || isempty(info.otwave) || ~info.volscan
-    config.Depth = 1;
-    config.ZStepSize = 0;
-else
-    config.Depth = numel(info.otwave_um);
-    config.ZStepSize = info.otwave_um;
 end
 
 

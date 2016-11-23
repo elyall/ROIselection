@@ -128,9 +128,9 @@ switch LoadType
         
         % Determine frames to load
         if ischar(Frames) || (numel(Frames)==1 && Frames == inf)
-            Frames = 1:Config.Frames;
+            Frames = 1:ceil(Config.Frames/Config.Depth);
         elseif Frames(end) == inf
-            Frames = [Frames(1:end-2),Frames(end-1):Config.Frames];
+            Frames = [Frames(1:end-2),Frames(end-1):ceil(Config.Frames/Config.Depth)];
         end
         numFrames = numel(Frames);
         
