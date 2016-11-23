@@ -194,7 +194,7 @@ switch LoadType
                 switch loadObj.files(index).ext
                     case '.sbx'
                         Images(:,:,:,:,startFrame(index):startFrame(index)+numFrames(index)-1)...
-                            = readSbx(ImageFiles{index}, [], 'Type', 'Direct', 'Frames', FrameIndex{index}, 'Channels', Channels, 'Depth', Depths, 'Verbose', Verbose);
+                            = readSbx(ImageFiles{index}, 'Type', 'Direct', 'Frames', FrameIndex{index}, 'Channels', Channels, 'Depth', Depths, 'Verbose', Verbose);
                     case '.tif'
                         Images(:,:,:,:,startFrame(index):startFrame(index)+numFrames(index)-1)...
                             = readScim(ImageFiles{index}, 'Frames', FrameIndex{index}, 'Channels', Channels, 'Verbose', Verbose);

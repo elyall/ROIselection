@@ -1,24 +1,46 @@
-function [Images, Config, InfoFile] = readSbx(SbxFile, InfoFile, varargin)
-% Loads 'Frames' of single .sbx file ('SbxFile'). Requires
-% corresponding information file ('InfoFile').
+function [Images, Config, InfoFile] = readSbx(SbxFile, varargin)
+%READSBX   Load .sbx files
+%   Images = readSbx() will prompt user to select a file to load.
+%
+%   [Images, Config, InfoFile] = readSbx(SbxFile) loads in the first
+%   default number of frames from the sbx file input, and returns the
+%   metadata and filename of associated info file.
+%
+%   Images = readSbx(..., 'Frames', X) loads in specific frames from file.
+%   Set X equal to inf to load in all frames.
+%
+%   Images = readSbx(..., 'Depths', Y) loads in specific depths from file.
+%   Set Y equal to inf to load in all depths.
+%
+%   Images = readSbx(..., 'Channels', Z) loads in all Channels, but then
+%   throws out all Channels except those requested (would take much much
+%   longer to just load a specific channel, as channels are interleaved
+%   every 16 bits).
 
-LoadType = 'Direct'; % 'MemMap' or 'Direct'
-Frames = 1:20; % indices of frames to load in 'Direct' mode, or 'all'
-Channels = 1;
-Depths = inf;
-Verbose = true;
 
-% Defaults
+% Default parameters that can be adjusted
+LoadType = 'Direct';% specifies how the data is loaded, can be: 'MemMap' or 'Direct'
+Frames = 1:20;      % indices of frames to load in 'Direct' mode, or 'all'
+Channels = 1;       % default channels to load
+Depths = inf;       % default depths to load
+Verbose = true;     % booleon determining whether to display progress bar
 invert = true;      % invert colormap boolean
 FramesPerDepth = 1; % number of frames acquired at each depth before moving to next depth
 flipLR = false;     % flip images across vertical axis
-xavg = 4;           % number of pixels to average for each pixel (scanbox version 1 only)
+xavg = 4;           % scanbox version 1: number of pixels to average for each pixel
+
+% Placeholders
+InfoFile = '';
+
 
 %% Initialize Parameters
 index = 1;
 while index<=length(varargin)
     try
         switch varargin{index}
+            case 'InfoFile'
+                InfoFile = varargin{index+1};
+                index = index + 2;
             case {'Type','type'}
                 LoadType = varargin{index+1}; %'Direct' or 'MemMap'
                 index = index + 2;
@@ -59,7 +81,7 @@ if ~exist('SbxFile', 'var') || isempty(SbxFile)
     SbxFile = fullfile(p,f);
 end
 
-if ~exist('InfoFile', 'var') || isempty(InfoFile)
+if isempty(InfoFile)
     InfoFile = sbxIdentifyFiles(SbxFile);
     InfoFile = InfoFile{1};
 end
