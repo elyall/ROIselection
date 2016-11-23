@@ -91,7 +91,11 @@ load(InfoFile, 'info'); %load in 'info' variable
 
 % Parse acquisition information
 Config = parseSbxHeader(InfoFile);
+if info.scanbox_version == 1 && Config.Depth > 1
+    error('Never coded proper loading of multiple depths for old data');
+end
 Config.loadType = LoadType;
+
 
 %% Load In Images
 switch LoadType
@@ -115,7 +119,7 @@ switch LoadType
             case 'uint16'
                 BytesPerPixel = 2;
         end
-        PixelsPerFrame = Config.Height*Config.Width;
+        HxW = Config.Height*Config.Width;
         
         % Determine frames to load
         if ischar(Frames) || (numel(Frames)==1 && Frames == inf)
@@ -142,15 +146,18 @@ switch LoadType
         numDepths = numel(Depths);
         
         % Determine indices within file to load
-        PacketSize = FramesPerDepth * numDepths;            % number of frames in cycle
-        F = reshape(1:PacketSize,FramesPerDepth,numDepths); % frame index corresponding to frame 1:FramesPerDepth of each depth
-        Findex = rem(Frames-1,FramesPerDepth)+1;            % index of each requested frame within FramesPerDepth
-        Frames = bsxfun(@plus, floor((Frames-1)/FramesPerDepth)'*PacketSize,F(Findex,:))'; % frame ID within whole movie
-        [Frames,order] = sort(Frames(:));                   % list of frame indices to load
+        if numDepths>1 % if numDepths==1 then frame indices is the same as the file indices
+            PacketSize = FramesPerDepth * Config.Depth;             % number of frames in cycle
+            F = reshape(1:PacketSize,FramesPerDepth,Config.Depth);  % frame index corresponding to frame 1:FramesPerDepth of each depth
+            Findex = rem(Frames-1,FramesPerDepth)+1;                % index of each requested frame within FramesPerDepth
+            Frames = bsxfun(@plus, floor((Frames-1)/FramesPerDepth)'*PacketSize,F(Findex,:)); % frame ID within whole movie
+            Frames = Frames(:,Depths)';                             % load only requested depths; transpose for vectorizing
+            [Frames,order] = sort(Frames(:));                       % list of frame indices to load
+        end
           
         % Preallocate output
         if info.scanbox_version ~= 1
-            Images = zeros(numChannels*PixelsPerFrame*FramesPerDepth*numDepths*floor(numFrames/FramesPerDepth),1, 'uint16');
+            Images = zeros(numChannels*HxW*FramesPerDepth*numDepths*numFrames,1, 'uint16');
         else % version 1
             Images = zeros(numChannels,Config.Width/xavg,Config.Height,numDepths,numFrames, 'uint16');
         end
@@ -171,20 +178,21 @@ switch LoadType
             
             % Load Images
             if Verbose
-                fprintf('Loading\t%d\tframe(s) from\t%s...', numFrames, SbxFile);
+                fprintf('Loading %7.d frame(s) & %2.d depth(s) from %s...', numFrames, numDepths, SbxFile);
+                t=tic;
             end
             
             % Cycle through loading in frames
             frewind(info.fid); % reset file
             for index = 1:length(startID)
-                if(fseek(info.fid, PixelsPerFrame*BytesPerPixel*Config.Channels*jumps(index),'cof')==0)
+                if(fseek(info.fid, HxW*BytesPerPixel*Config.Channels*jumps(index),'cof')==0)
                     if info.scanbox_version ~= 1
-                        Images((startID(index)-1)*PixelsPerFrame+1:PixelsPerFrame*(startID(index)+N(index)-1)) = fread(info.fid, PixelsPerFrame*Config.Channels*N(index), 'uint16=>uint16');
-                    else % downsample/averaging
-                        temp = fread(info.fid, PixelsPerFrame * Config.Depth * Config.Channels * N(index), 'uint16=>uint16');
-                        temp = mean(reshape(temp,[Config.Channels xavg Config.Width/xavg Config.Height Config.Depth N(index)]), 2);
-                        temp = reshape(temp,[Config.numChannels Config.Width/xavg Config.Height Config.Depth N(index)]);
-                        Images(:,:,:,:,startID(index):startID(index)+N(index)-1) = temp(Channels,:,:,Depths,:); % save only requested channels & depths
+                        Images((startID(index)-1)*HxW+1:HxW*(startID(index)+N(index)-1)) = fread(info.fid, HxW*Config.Channels*N(index), 'uint16=>uint16');
+                    else % downsample/averaging to avoid overloading memory
+                        temp = fread(info.fid, HxW*Config.Channels*N(index), 'uint16=>uint16');
+                        temp = mean(reshape(temp,[Config.Channels xavg Config.Width/xavg Config.Height 1 N(index)]), 2);
+                        temp = reshape(temp,[Config.numChannels Config.Width/xavg Config.Height 1 N(index)]);
+                        Images(:,:,:,:,startID(index):startID(index)+N(index)-1) = temp(Channels,:,:,1,:); % save only requested channels & depths
                     end
                 else
                     warning('fseek error...');
@@ -198,7 +206,7 @@ switch LoadType
                     Images = reshape(Images,numChannels,Config.Width,Config.Height,numDepths,numFrames); % reshape vector to usable format
                 else % FramesPerDepth > 1 -> requested frames could be out of order
                     Images = reshape(Images,numChannels,Config.Width,Config.Height,numel(Frames));
-                    warning('Never tested that the next line works, please verify this is valid...');
+                    warning('Never tested that the next line works, please verify it is valid...');
                     Images = Images(:,:,:,order);
                     Images = reshape(Images,numChannels,Config.Width,Config.Height,numDepths,numFrames); % reshape vector to usable format
                 end
@@ -248,7 +256,17 @@ switch LoadType
         Config.size = size(Images);
         
         if Verbose
-            fprintf('\tComplete\n');
+            t=toc(t);
+            if t<60
+                s = 'seconds';
+            elseif t<3600
+                t = t/60;
+                s = 'minutes';
+            else
+                t = t/3600;
+                s = 'hours';
+            end
+            fprintf('\tComplete (%.2f %s)\n',t,s);
         end
 
 end
