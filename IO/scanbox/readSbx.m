@@ -31,7 +31,7 @@ xavg = 4;           % scanbox version 1: number of pixels to average for each pi
 
 % Placeholders
 InfoFile = '';
-
+directory = cd;
 
 %% Initialize Parameters
 index = 1;
@@ -59,6 +59,9 @@ while index<=length(varargin)
             case {'Flip', 'flip'}
                 flipLR = varargin{index+1};
                 index = index + 2;
+            case 'FramesPerDepth'
+                FramesPerDepth = varargin{index+1};
+                index = index + 2;
             case {'Verbose', 'verbose'}
                 Verbose = varargin{index+1};
                 index = index + 2;
@@ -73,7 +76,6 @@ while index<=length(varargin)
 end
 
 if ~exist('SbxFile', 'var') || isempty(SbxFile)
-    directory = CanalSettings('DataDirectory');
     [f,p] = uigetfile({'*.sbx'}, 'Choose scanbox file to load', directory);
     if isnumeric(f)
         Images = []; return
@@ -128,9 +130,14 @@ switch LoadType
         
         % Determine frames to load
         if ischar(Frames) || (numel(Frames)==1 && Frames == inf)
-            Frames = 1:ceil(Config.Frames/Config.Depth);
+            Frames = 1:Config.Frames;
         elseif Frames(end) == inf
-            Frames = [Frames(1:end-2),Frames(end-1):ceil(Config.Frames/Config.Depth)];
+            Frames = [Frames(1:end-2),Frames(end-1):Config.Frames];
+        end
+        if Config.Depth>1
+            Frames(Frames>ceil(Config.Frames/Config.Depth) || Frames<1) = []; % remove requested frames that don't exist
+        else
+            Frames(Frames>Config.Frames || Frames<1) = []; % remove requested frames that don't exist
         end
         numFrames = numel(Frames);
         
@@ -152,12 +159,9 @@ switch LoadType
         
         % Determine indices within file to load
         if Config.Depth>1 % if Config.Depth==1 then frame indices is the same as the file indices
-            PacketSize = FramesPerDepth * Config.Depth;             % number of frames in cycle
-            F = reshape(1:PacketSize,FramesPerDepth,Config.Depth);	% frame index corresponding to frame 1:FramesPerDepth of each depth
-            Findex = rem(Frames-1,FramesPerDepth)+1;                % index of each requested frame within FramesPerDepth
-            Frames = bsxfun(@plus, floor((Frames-1)/FramesPerDepth)'*PacketSize,F(Findex,:)); % frame ID within whole movie
-            Frames = Frames(:,Depths)';                             % load only requested depths; transpose for vectorizing
-            [Frames,order] = sort(Frames(:));                       % list of frame indices to load
+            Frames = idDepth(Config,'Frames',Frames); % determine file indices of frames requested
+            Frames = Frames(:,Depths)';               % keep only requested depths; transpose for vectorizing
+            [Frames,order] = sort(Frames(:));         % list of frame indices to load
         else
             Frames = Frames';
         end
