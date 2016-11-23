@@ -120,40 +120,28 @@ switch LoadType
         numDepths = numel(Depths);
         
         % Determine indices within file to load
-        PacketSize = FramesPerDepth * numDepths;
-        F = reshape(1:PacketSize,FramesPerDepth,numDepths);
-        Findex = rem(Frames-1,FramesPerDepth)+1;
-        Frames = bsxfun(@plus, floor(Frames/numDepths)',F(Findex,:)); % STILL WRONG for 
-        
-        
-        Frames = Frames-1; % offset b/c of "0" indexing when loading
-
-        
-        
-        if rem(numFrames,FramesPerDepth)~=0
-            Frames = [Frames,nan(1,FramesPerDepth-rem(numFrames,FramesPerDepth))];
-        end
-        Frames = reshape(Frames, FramesPerDepth, ceil(numFrames/FramesPerDepth));
-        Frames = repmat(Frames, [1,1,FramesPerDepth]);
-        Frames = bsxfun(@plus, repmat(temp',1,1,FramesPerDepth)*Config.Depth, 1:FramesPerDepth:Config.Depth*FramesPerDepth);
-        Frames = bsxfun(@plus, Frames, permute(0:FramesPerDepth-1,[1,3,2]));
-        
+        PacketSize = FramesPerDepth * numDepths;            % number of frames in cycle
+        F = reshape(1:PacketSize,FramesPerDepth,numDepths); % frame index corresponding to frame 1:FramesPerDepth of each depth
+        Findex = rem(Frames-1,FramesPerDepth)+1;            % index of each requested frame within FramesPerDepth
+        Frames = bsxfun(@plus, floor((Frames-1)/FramesPerDepth)'*PacketSize,F(Findex,:))'; % frame ID within whole movie
+        [Frames,order] = sort(Frames(:));                   % list of frame indices to load
+          
         % Preallocate output
         if info.scanbox_version ~= 1
-            Images = zeros(numChannels*PixelsPerFrame*FramesPerDepth*numDepths*floor(numFrames/FramesPerDepth), 'uint16');
+            Images = zeros(numChannels*PixelsPerFrame*FramesPerDepth*numDepths*floor(numFrames/FramesPerDepth),1, 'uint16');
         else % version 1
             Images = zeros(numChannels,Config.Width/xavg,Config.Height,numDepths,numFrames, 'uint16');
         end
 
         % Determine number and location of seek operations due to non-contiguous frame requests (jumps)
-        seekoperations = find(diff(Frames)~=1); %find any jumps within the frames to read out (jumps requiring seeking)
-        if isempty(seekoperations) %no jumps
-            numframesperread = numFrames; %all frames will be read in one read
-            seekoperations = 1; %only one seek operation to first frame of FrameIndex
-        else
-            numframesperread = diff([0,seekoperations,numFrames]); %multiple reads required with various numbers of frames per read
-            seekoperations = [1,seekoperations+1]; %indexes the first frame of each read within FrameIndex
+        jumps = diff([0;Frames])-1;     % number of frames to jump
+        startID = find(jumps);          % indices of jump locations relative to frame indices
+        if ~jumps(1)                    % loading very first frame in file
+            startID = [1;startID];      % ensures chunk containing first frame is loaded
         end
+        jumps = jumps(startID);
+        N = diff([startID-1;numFrames*numDepths]); % number of frames to load in on each loop
+
         
         % Open File
         info.fid = fopen(SbxFile);
@@ -165,15 +153,16 @@ switch LoadType
             end
             
             % Cycle through loading in frames
-            for index = 1:length(seekoperations)
-                if(fseek(info.fid, PixelsPerFrame * BytesPerPixel * Config.Depth * Config.Channels * Frames(seekoperations(index)), 'bof')==0)
+            frewind(info.fid); % reset file
+            for index = 1:length(startID)
+                if(fseek(info.fid, PixelsPerFrame*BytesPerPixel*Config.Channels*jumps(index),'cof')==0)
                     if info.scanbox_version ~= 1
-                        Images(seekoperations(index):seekoperations(index)+numframesperread(index)-1) = fread(info.fid, PixelsPerFrame * Config.Depth * Config.Channels * numframesperread(index), 'uint16=>uint16');
+                        Images((startID(index)-1)*PixelsPerFrame+1:PixelsPerFrame*(startID(index)+N(index)-1)) = fread(info.fid, PixelsPerFrame*Config.Channels*N(index), 'uint16=>uint16');
                     else % downsample/averaging
-                        temp = fread(info.fid, PixelsPerFrame * Config.Depth * Config.Channels * numframesperread(index), 'uint16=>uint16');
-                        temp = mean(reshape(temp,[Config.Channels xavg Config.Width/xavg Config.Height Config.Depth numframesperread(index)]), 2);
-                        temp = reshape(temp,[Config.numChannels Config.Width/xavg Config.Height Config.Depth numframesperread(index)]);
-                        Images(:,:,:,:,seekoperations(index):seekoperations(index)+numframesperread(index)-1) = temp(Channels,:,:,Depths,:); % save only requested channels & depths
+                        temp = fread(info.fid, PixelsPerFrame * Config.Depth * Config.Channels * N(index), 'uint16=>uint16');
+                        temp = mean(reshape(temp,[Config.Channels xavg Config.Width/xavg Config.Height Config.Depth N(index)]), 2);
+                        temp = reshape(temp,[Config.numChannels Config.Width/xavg Config.Height Config.Depth N(index)]);
+                        Images(:,:,:,:,startID(index):startID(index)+N(index)-1) = temp(Channels,:,:,Depths,:); % save only requested channels & depths
                     end
                 else
                     warning('fseek error...');
@@ -183,10 +172,13 @@ switch LoadType
             
             % Reshape images & keep only desired channels
             if info.scanbox_version ~= 1
-                if FramesPerDepth == 1
+                if FramesPerDepth == 1 || numDepths == 1
                     Images = reshape(Images,numChannels,Config.Width,Config.Height,numDepths,numFrames); % reshape vector to usable format
-                else
-                    Images = reshape(Images,numChannels,Config.Width,Config.Height,FramesPerDepth,numDepths,floor(numFrames/FramesPerDepth)); % reshape vector to usable format
+                else % FramesPerDepth > 1 -> requested frames could be out of order
+                    Images = reshape(Images,numChannels,Config.Width,Config.Height,numel(Frames));
+                    warning('Never tested that the next line works, please verify this is valid...');
+                    Images = Images(:,:,:,order);
+                    Images = reshape(Images,numChannels,Config.Width,Config.Height,numDepths,numFrames); % reshape vector to usable format
                 end
                 Images = Images(Channels,:,:,:,:); % keep only requested channels
             end
