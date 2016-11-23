@@ -109,6 +109,6 @@ end
 config.Precision = 'uint16'; % default
 config.DimensionOrder = {'Channels','Width','Height','Depth','Frames'}; % default
 config.Colors = {'green', 'red'};
-config.size = [config.Height, config.Width, config.Depth, config.Channels, config.Frames];
+config.size = [config.Height, config.Width, config.Depth, config.Channels, ceil(config.Frames/config.Depth)];
 
 
