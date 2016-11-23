@@ -86,6 +86,11 @@ if isempty(InfoFile)
     InfoFile = InfoFile{1};
 end
 
+if iscolumn(Frames)
+    Frames = Frames';
+end
+
+
 %% Load In Acquisition Information
 load(InfoFile, 'info'); %load in 'info' variable
 
@@ -146,13 +151,15 @@ switch LoadType
         numDepths = numel(Depths);
         
         % Determine indices within file to load
-        if numDepths>1 % if numDepths==1 then frame indices is the same as the file indices
+        if Config.Depth>1 % if Config.Depth==1 then frame indices is the same as the file indices
             PacketSize = FramesPerDepth * Config.Depth;             % number of frames in cycle
-            F = reshape(1:PacketSize,FramesPerDepth,Config.Depth);  % frame index corresponding to frame 1:FramesPerDepth of each depth
+            F = reshape(1:PacketSize,FramesPerDepth,Config.Depth);	% frame index corresponding to frame 1:FramesPerDepth of each depth
             Findex = rem(Frames-1,FramesPerDepth)+1;                % index of each requested frame within FramesPerDepth
             Frames = bsxfun(@plus, floor((Frames-1)/FramesPerDepth)'*PacketSize,F(Findex,:)); % frame ID within whole movie
             Frames = Frames(:,Depths)';                             % load only requested depths; transpose for vectorizing
             [Frames,order] = sort(Frames(:));                       % list of frame indices to load
+        else
+            Frames = Frames';
         end
           
         % Preallocate output
@@ -187,7 +194,7 @@ switch LoadType
             for index = 1:length(startID)
                 if(fseek(info.fid, HxW*BytesPerPixel*Config.Channels*jumps(index),'cof')==0)
                     if info.scanbox_version ~= 1
-                        Images((startID(index)-1)*HxW+1:HxW*(startID(index)+N(index)-1)) = fread(info.fid, HxW*Config.Channels*N(index), 'uint16=>uint16');
+                        Images((startID(index)-1)*HxW+1:HxW*(startID(index)-1+N(index))) = fread(info.fid, HxW*Config.Channels*N(index), 'uint16=>uint16');
                     else % downsample/averaging to avoid overloading memory
                         temp = fread(info.fid, HxW*Config.Channels*N(index), 'uint16=>uint16');
                         temp = mean(reshape(temp,[Config.Channels xavg Config.Width/xavg Config.Height 1 N(index)]), 2);
@@ -207,22 +214,18 @@ switch LoadType
                 else % FramesPerDepth > 1 -> requested frames could be out of order
                     Images = reshape(Images,numChannels,Config.Width,Config.Height,numel(Frames));
                     warning('Never tested that the next line works, please verify it is valid...');
-                    Images = Images(:,:,:,order);
+                    Images = Images(:,:,:,order); % <= VERIFY THIS LINE REORDERS DATA CORRECTLY (really only necessary when rem(numFrames,FramesPerDepth)~=0)
                     Images = reshape(Images,numChannels,Config.Width,Config.Height,numDepths,numFrames); % reshape vector to usable format
                 end
                 Images = Images(Channels,:,:,:,:); % keep only requested channels
             end
             
-            % Update dimensions (v.1 only)
-            if info.scanbox_version == 1
-                Config.Width = Config.Width/xavg;
-            end
-            
             % Reorder dimensions
-            Images = permute(Images, [3 2 4 1 5]); % flip colormap and reorder (original [1,3,2,4] => rotate images)
+            Images = permute(Images, [3 2 4 1 5]); % flip and move channels to fourth dimension
             
             % Correct for nonuniform spatial sampling
             if info.scanbox_version == 1
+                Config.Width = Config.Width/xavg; % update dimensions for Config output
                 S = sparseint;
                 info.Width = size(S,2);
                 good = zeros(Config.Height, Config.Width, 1, numChannels, Config.Frames);
@@ -241,6 +244,7 @@ switch LoadType
                 Images = intmax('uint16') - Images;
             end
             
+            % Flip across Y axis
             if flipLR
                 Images = fliplr(Images);
             end
@@ -249,11 +253,12 @@ switch LoadType
             warning('unable to open file: %s', SbxFile);
             Images = [];
         end
-        fclose(info.fid);
+        fclose(info.fid); % close file
         
-        Config.DimensionOrder = Config.DimensionOrder([3 2 4 1 5]);
         
-        Config.size = size(Images);
+        Config.DimensionOrder = Config.DimensionOrder([3 2 4 1 5]); % update dimensions to that of output as compared to what they are in the file
+        Config.size = size(Images); % update size of output
+        
         
         if Verbose
             t=toc(t);
@@ -264,7 +269,7 @@ switch LoadType
                 s = 'minutes';
             else
                 t = t/3600;
-                s = 'hours';
+                s = 'hours -> probably overloading RAM and using swap space, it''s recommended to load less frames at a time';
             end
             fprintf('\tComplete (%.2f %s)\n',t,s);
         end
