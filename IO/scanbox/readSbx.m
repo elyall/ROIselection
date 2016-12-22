@@ -135,9 +135,9 @@ switch LoadType
             Frames = [Frames(1:end-2),Frames(end-1):Config.Frames];
         end
         if Config.Depth>1
-            Frames(Frames>ceil(Config.Frames/Config.Depth) || Frames<1) = []; % remove requested frames that don't exist
+            Frames(Frames>ceil(Config.Frames/Config.Depth) | Frames<1) = []; % remove requested frames that don't exist
         else
-            Frames(Frames>Config.Frames || Frames<1) = []; % remove requested frames that don't exist
+            Frames(Frames>Config.Frames | Frames<1) = []; % remove requested frames that don't exist
         end
         numFrames = numel(Frames);
         
