@@ -25,7 +25,6 @@ Channels = 1;       % default channels to load
 Depths = inf;       % default depths to load
 Verbose = true;     % booleon determining whether to display progress bar
 invert = true;      % invert colormap boolean
-FramesPerDepth = 1; % number of frames acquired at each depth before moving to next depth
 flipLR = false;     % flip images across vertical axis
 xavg = 4;           % scanbox version 1: number of pixels to average for each pixel
 
@@ -58,9 +57,6 @@ while index<=length(varargin)
                 index = index + 2;
             case {'Flip', 'flip'}
                 flipLR = varargin{index+1};
-                index = index + 2;
-            case 'FramesPerDepth'
-                FramesPerDepth = varargin{index+1};
                 index = index + 2;
             case {'Verbose', 'verbose'}
                 Verbose = varargin{index+1};
@@ -134,11 +130,7 @@ switch LoadType
         elseif Frames(end) == inf
             Frames = [Frames(1:end-2),Frames(end-1):Config.Frames];
         end
-        if Config.Depth>1
-            Frames(Frames>ceil(Config.Frames/Config.Depth) | Frames<1) = []; % remove requested frames that don't exist
-        else
-            Frames(Frames>Config.Frames | Frames<1) = []; % remove requested frames that don't exist
-        end
+        Frames(Frames>Config.Frames | Frames<1) = []; % remove requested frames that don't exist
         numFrames = numel(Frames);
         
         % Determine channels to load
@@ -159,18 +151,18 @@ switch LoadType
         
         % Determine indices within file to load
         if Config.Depth>1 % if Config.Depth==1 then frame indices is the same as the file indices
-            Frames = idDepth(Config,'IndexType','absolute','Frames',Frames,'Depths',Depths);   % determine file indices of frames requested
-            Frames = Frames';                                           % transpose to make sort easier
-            [Frames,order] = sort(Frames(:));                           % list of frame indices to load
+            depthID = idDepth(Config,'IndexType','absolute','Frames',Frames,'Depths',Depths)';  % determine file indices of frames requested
+            Frames = sort(depthID(:));                                                          % list of frame indices to load
+            Frames(isnan(Frames)) = []; % remove NaN's
         else
             Frames = Frames';
         end
           
         % Preallocate output
         if info.scanbox_version ~= 1
-            Images = zeros(numChannels*HxW*FramesPerDepth*numDepths*numFrames,1, 'uint16');
+            Images = zeros(numChannels*HxW*numFrames,1, 'uint16');
         else % version 1
-            Images = zeros(numChannels,Config.Width/xavg,Config.Height,numDepths,numFrames, 'uint16');
+            Images = zeros(numChannels,Config.Width/xavg,Config.Height,1,numFrames, 'uint16');
         end
 
         % Determine number and location of seek operations due to non-contiguous frame requests (jumps)
@@ -180,7 +172,7 @@ switch LoadType
             startID = [1;startID];      % ensures chunk containing first frame is loaded
         end
         jumps = jumps(startID);
-        N = diff([startID-1;numFrames*numDepths]); % number of frames to load in on each loop
+        N = diff([startID-1;numFrames]); % number of frames to load in on each loop
 
         
         % Open File
@@ -189,7 +181,7 @@ switch LoadType
             
             % Load Images
             if Verbose
-                fprintf('Loading %7.d frame(s) & %2.d depth(s) from %s...', numFrames, numDepths, SbxFile);
+                fprintf('Loading %7.d frame(s) from %s...', numFrames, SbxFile);
                 t=tic;
             end
             
@@ -213,19 +205,17 @@ switch LoadType
             
             % Reshape images & keep only desired channels
             if info.scanbox_version ~= 1
-                if FramesPerDepth == 1 || numDepths == 1
-                    Images = reshape(Images,numChannels,Config.Width,Config.Height,numDepths,numFrames); % reshape vector to usable format
-                else % FramesPerDepth > 1 -> requested frames could be out of order
-                    Images = reshape(Images,numChannels,Config.Width,Config.Height,numel(Frames));
-                    warning('Never tested that the next line works, please verify it is valid...');
-                    Images = Images(:,:,:,order); % <= VERIFY THIS LINE REORDERS DATA CORRECTLY (really only necessary when rem(numFrames,FramesPerDepth)~=0)
-                    Images = reshape(Images,numChannels,Config.Width,Config.Height,numDepths,numFrames); % reshape vector to usable format
-                end
+                Images = reshape(Images,numChannels,Config.Width,Config.Height,1,numFrames); % reshape vector to usable format
                 Images = Images(Channels,:,:,:,:); % keep only requested channels
             end
             
             % Reorder dimensions
             Images = permute(Images, [3 2 4 1 5]); % flip and move channels to fourth dimension
+            
+            % Reshape depths
+            if Config.Depth > 1 && numDepths > 1
+                Images = depthShape(Images,Frames,depthID');
+            end
             
             % Correct for nonuniform spatial sampling
             if info.scanbox_version == 1
