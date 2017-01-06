@@ -131,7 +131,6 @@ switch LoadType
             Frames = [Frames(1:end-2),Frames(end-1):Config.Frames];
         end
         Frames(Frames>Config.Frames | Frames<1) = []; % remove requested frames that don't exist
-        numFrames = numel(Frames);
         
         % Determine channels to load
         if ischar(Channels) || (numel(Channels)==1 && Channels == inf)
@@ -157,7 +156,8 @@ switch LoadType
         else
             Frames = Frames';
         end
-          
+        numFrames = numel(Frames);
+
         % Preallocate output
         if info.scanbox_version ~= 1
             Images = zeros(numChannels*HxW*numFrames,1, 'uint16');
@@ -212,7 +212,7 @@ switch LoadType
             % Reorder dimensions
             Images = permute(Images, [3 2 4 1 5]); % flip and move channels to fourth dimension
             
-            % Reshape depths
+            % Reshape if multiple depths are being loaded
             if Config.Depth > 1 && numDepths > 1
                 Images = depthShape(Images,Frames,depthID');
             end
