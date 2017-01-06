@@ -167,9 +167,6 @@ switch LoadType
                 FrameIndex{findex} = temp(findex, temp(findex,:)>=1 & temp(findex,:)<=numFrames(findex));
             end
         end
-        for findex = 1:numFiles
-            numFrames(findex) = numel(FrameIndex{findex});
-        end
         
         % Determine Channels to Load (FILES ALL MUST HAVE DESIRED CHANNEL
         % OR WILL ERROR)
@@ -178,15 +175,35 @@ switch LoadType
         elseif Channels(end) == inf
             Channels = [Channels(1:end-2),Channels(end-1):min([Config(:).Channels])];
         end
+        numChannels = numel(Channels);
         
+        % Determine Depths to load (defaults to minimum # of channels)
         if ischar(Depths) || (numel(Depths)==1 && Depths == inf)
             Depths = 1:min([Config(:).Depth]); % load all channels (based on file with minimum # of depths)
         elseif Depths(end) == inf
             Depths = [Depths(1:end-2),Depths(end-1):min([Config(:).Depths])];
         end
+        numDepths = numel(Depths);
+        
+        % Determine absolute frame indices to load from each file
+        numFrames = zeros(1,numFiles);
+        for index = 1:numFiles
+            if  ~isempty(FrameIndex{index})
+                if Config(index).Depth>1
+                    depthID = idDepth(Config(index),'IndexType','absolute','Frames',FrameIndex{index},'Depths',Depths)'; % determine file indices of frames requested
+                    numFrames(index) = size(depthID,2);
+                    FrameIndex{index} = sort(depthID(:))'; % list of frame indices to load
+                    FrameIndex{index}(isnan(FrameIndex{index})) = []; % remove NaN's
+                    loadObj.FrameIndex = cat(1, loadObj.FrameIndex, cat(2, index*ones(size(depthID,2),1), depthID'));
+                else
+                    numFrames(index) = numel(FrameIndex{index});
+                    loadObj.FrameIndex = cat(1, loadObj.FrameIndex, cat(2, index*ones(numel(FrameIndex{index}),1), FrameIndex{index}'));
+                end
+            end
+        end
         
         % Load Images
-        Images = zeros(Config(1).Height, Config(1).Width, numel(Depths), numel(Channels), sum(numFrames), 'uint16');
+        Images = zeros(Config(1).Height, Config(1).Width, numDepths, numChannels, sum(numFrames), 'uint16');
         startFrame = cumsum([1,numFrames(1:end-1)]);
         for index = 1:numFiles
             [~,~,loadObj.files(index).ext] = fileparts(ImageFiles{index});
@@ -203,7 +220,7 @@ switch LoadType
                             = readImgs(ImageFiles{index}, 'Type', 'Direct', 'Frames', FrameIndex{index}, 'Channels', Channels);
                 end
             end
-            loadObj.FrameIndex = cat(1, loadObj.FrameIndex, cat(2, repmat(index, numFrames(index), 1), FrameIndex{index}'));
+            
         end
         
         if Double && ~isa(Images, 'double')

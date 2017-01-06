@@ -27,6 +27,7 @@ Verbose = true;     % booleon determining whether to display progress bar
 invert = true;      % invert colormap boolean
 flipLR = false;     % flip images across vertical axis
 xavg = 4;           % scanbox version 1: number of pixels to average for each pixel
+organizeDepths=true;% booleon determining whether to reshape file with multiple depths into 5D matrix or leave frames interleaved
 
 % Placeholders
 InfoFile = '';
@@ -57,6 +58,9 @@ while index<=length(varargin)
                 index = index + 2;
             case {'Flip', 'flip'}
                 flipLR = varargin{index+1};
+                index = index + 2;
+            case 'organizeDepths'
+                organizeDepths = varargin{index+1};
                 index = index + 2;
             case {'Verbose', 'verbose'}
                 Verbose = varargin{index+1};
@@ -212,11 +216,6 @@ switch LoadType
             % Reorder dimensions
             Images = permute(Images, [3 2 4 1 5]); % flip and move channels to fourth dimension
             
-            % Reshape if multiple depths are being loaded
-            if Config.Depth > 1 && numDepths > 1
-                Images = depthShape(Images,Frames,depthID');
-            end
-            
             % Correct for nonuniform spatial sampling
             if info.scanbox_version == 1
                 Config.Width = Config.Width/xavg; % update dimensions for Config output
@@ -241,6 +240,11 @@ switch LoadType
             % Flip across Y axis
             if flipLR
                 Images = fliplr(Images);
+            end
+            
+            % Reshape if multiple depths are being loaded
+            if organizeDepths && Config.Depth > 1 && numDepths > 1
+                Images = depthShape(Images,Frames,depthID');
             end
             
         else

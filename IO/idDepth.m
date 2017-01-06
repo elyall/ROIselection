@@ -111,6 +111,7 @@ end
 if ~isempty(Depths)
     if all(ismember(Depths,1:size(FrameIDs,2)))
         FrameIDs = FrameIDs(:,Depths);
+        FrameIDs(all(isnan(FrameIDs),2),:) = []; % remove rows with all frames missing from requested depths
     else
         warning('Depth index requested not contained within depth indices. Returning frame indices for all depths...');
     end
