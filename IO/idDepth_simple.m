@@ -1,4 +1,4 @@
-function FrameIDs = idDepth(Config,varargin)
+function FrameIDs = idDepth_simple(Config,varargin)
 
 Depths = [];
 Frames = [1,inf];

@@ -1,4 +1,4 @@
-function Frames = idDepth(Config,varargin)
+function FrameIDs = idDepth(Config,varargin)
 
 Depths = [];
 Frames = [1,inf];
@@ -46,8 +46,13 @@ end
 if ischar(Config)
     Config = load2PConfig(Config);
 end
+
+% In case where there is only one depth, skip the nonsense
 if Config.Depth == 1
-    Frames = (1:Config.Frames)';
+    if Frames(end)==inf
+        Frames = [Frames(1:end-2),Frames(end-1):Config.Frames]; % load all frames
+    end
+    Frames = Frames';
     return
 end
 
@@ -62,45 +67,50 @@ Cycle = reshape(1:CycleSize,FramesPerDepth,Config.Depth);   % frame index corres
 switch IndexType
     case 'relative'
 
-        % Determine frames to load
-        [RelativeIndicesInLastCycle,~] = find(Cycle<=rem(Config.Frames,CycleSize));                         % relative indices of frames in last cycle if it wasn't completed
+        % Determine relative frames to use
+        if rem(Config.Frames,CycleSize)                                                                     % last cycle didn't complete
+            [RelativeIndicesInLastCycle,~] = find(Cycle<=rem(Config.Frames,CycleSize));                     % relative indices of frames in last cycle
+        else
+            RelativeIndicesInLastCycle = 0;                                                                 % last cycle completed
+        end
         maxRelativeIndex = FramesPerDepth*floor(Config.Frames/CycleSize)+max(RelativeIndicesInLastCycle);   % maximum relative index in file
         if Frames(end) == inf
-            Frames = [Frames(1:end-2),Frames(end-1):maxRelativeIndex];                                      % load all frames
+            Frames = [Frames(1:end-2),Frames(end-1):maxRelativeIndex];                                      % use all frames
         end
-        Frames(Frames>maxRelativeIndex | Frames<1) = [];                                                    % remove requested frames that don't exist
-        
-        % Determine frame indices
-        Findex = rem(Frames-1,FramesPerDepth)+1;                                                % index of each requested frame within FramesPerDepth
-        Frames = bsxfun(@plus, floor((Frames-1)/FramesPerDepth)'*CycleSize,Cycle(Findex,:));    % frame ID within whole movie; transpose for vectorizing
-        Frames(Frames>Config.Frames) = nan; % remove frames that don't exist (occurs if last cycle wasn't complete)
-
+        % Frames(Frames>maxRelativeIndex) = [];                                                               % remove requested frames that don't exist
+        RelativeIndex = Frames;
+       
     case 'absolute'
         
-        % Determine frames to load
+        % Determine absolute frames to use
         if Frames(end) == inf
-            Frames = [Frames(1:end-2),Frames(end-1):Config.Frames]; % load all frames
+            Frames = [Frames(1:end-2),Frames(end-1):Config.Frames]; % use all frames
         end
         
         % Determine relative indices of frames requested
         [~,ind]=ismember(rem(Frames-1,CycleSize)+1,Cycle);
-        [RelativeIndexInCycle,~] = ind2sub(size(Cycle),ind);% relative indices of frames in their cycle
-        RelativeIndex = floor((Frames-1)/CycleSize)+RelativeIndexInCycle;   % relative indices of frames requested
-        RelativeIndex = unique(RelativeIndex);
+        [RelativeIndexInCycle,~] = ind2sub(size(Cycle),ind);                            % relative indices of frames in their cycle
+        RelativeIndex = FramesPerDepth*floor((Frames-1)/CycleSize)+RelativeIndexInCycle;% relative indices of frames requested
+        RelativeIndex = unique(RelativeIndex);                                          % remove redundant indices
         
-        % Determine frame indices
-        Findex = rem(RelativeIndex-1,FramesPerDepth)+1;                                                % index of each requested frame within FramesPerDepth
-        temp = bsxfun(@plus, floor((RelativeIndex-1)/FramesPerDepth)'*CycleSize,Cycle(Findex,:));    % frame ID within whole movie; transpose for vectorizing
-        temp(~ismember(temp,Frames)) = nan; % remove indices that aren't requested
-        Frames = temp;
-        
+end
+
+% Determine frame indices
+Findex = rem(RelativeIndex-1,FramesPerDepth)+1;                                                 % index of each requested frame within FramesPerDepth
+FrameIDs = bsxfun(@plus, floor((RelativeIndex-1)/FramesPerDepth)'*CycleSize,Cycle(Findex,:));   % frame ID within whole movie; transpose for vectorizing
+
+switch IndexType
+    case 'relative'
+        FrameIDs(FrameIDs>Config.Frames) = nan;     % remove frames that don't exist (occurs if last cycle wasn't complete)
+    case 'absolute'
+        FrameIDs(~ismember(FrameIDs,Frames)) = nan; % remove indices that aren't requested
 end
 
 
 %% Keep only requested depth(s)
 if ~isempty(Depths)
-    if all(ismember(Depths,1:size(Frames,2)))
-        Frames = Frames(:,Depths);
+    if all(ismember(Depths,1:size(FrameIDs,2)))
+        FrameIDs = FrameIDs(:,Depths);
     else
         warning('Depth index requested not contained within depth indices. Returning frame indices for all depths...');
     end
