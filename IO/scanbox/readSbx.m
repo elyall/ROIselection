@@ -159,9 +159,9 @@ switch LoadType
         
         % Determine indices within file to load
         if Config.Depth>1 % if Config.Depth==1 then frame indices is the same as the file indices
-            Frames = idDepth(Config,'Frames',Frames); % determine file indices of frames requested
-            Frames = Frames(:,Depths)';               % keep only requested depths; transpose for vectorizing
-            [Frames,order] = sort(Frames(:));         % list of frame indices to load
+            Frames = idDepth(Config,'Frames',Frames,'Depths',Depths);   % determine file indices of frames requested
+            Frames = Frames';                                           % transpose to make sort easier
+            [Frames,order] = sort(Frames(:));                           % list of frame indices to load
         else
             Frames = Frames';
         end
