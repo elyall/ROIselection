@@ -1,4 +1,4 @@
-function FrameIDs = idDepth(Config,varargin)
+function [FrameIDs,RelativeIndex] = idDepth(Config,varargin)
 
 Depths = [];
 Frames = [1,inf];
@@ -78,7 +78,7 @@ switch IndexType
             Frames = [Frames(1:end-2),Frames(end-1):maxRelativeIndex];                                      % use all frames
         end
         % Frames(Frames>maxRelativeIndex) = [];                                                               % remove requested frames that don't exist
-        RelativeIndex = Frames;
+        RelativeIndex = Frames';
        
     case 'absolute'
         
@@ -91,13 +91,13 @@ switch IndexType
         [~,ind]=ismember(rem(Frames-1,CycleSize)+1,Cycle);
         [RelativeIndexInCycle,~] = ind2sub(size(Cycle),ind);                            % relative indices of frames in their cycle
         RelativeIndex = FramesPerDepth*floor((Frames-1)/CycleSize)+RelativeIndexInCycle;% relative indices of frames requested
-        RelativeIndex = unique(RelativeIndex);                                          % remove redundant indices
+        RelativeIndex = unique(RelativeIndex)';                                          % remove redundant indices
         
 end
 
 % Determine frame indices
 Findex = rem(RelativeIndex-1,FramesPerDepth)+1;                                                 % index of each requested frame within FramesPerDepth
-FrameIDs = bsxfun(@plus, floor((RelativeIndex-1)/FramesPerDepth)'*CycleSize,Cycle(Findex,:));   % frame ID within whole movie; transpose for vectorizing
+FrameIDs = bsxfun(@plus, floor((RelativeIndex-1)/FramesPerDepth)*CycleSize,Cycle(Findex,:));   % frame ID within whole movie; transpose for vectorizing
 
 switch IndexType
     case 'relative'

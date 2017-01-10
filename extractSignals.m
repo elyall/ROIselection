@@ -24,6 +24,7 @@ saveOut = false;            % true or false
 saveFile = '';              % filename to save ROIdata output to (defaults to ROIFile if one is input)
 MotionCorrect = false;      % false, filename to load MCdata from, or true to prompt for file selection
 Channel = 1;                % channel to extract data from
+Depth = 1;                  % depth to extract data from
 FrameIndex = [1, inf];      % vector of frame indices
 borderLims = [0,0,34,34];   % number of pixels to remove from edges when computing ROI means (top, bottom, left, right)
 
@@ -56,6 +57,9 @@ while index<=length(varargin)
                 index = index + 2;
             case 'Channel'
                 Channel = varargin{index+1};
+                index = index + 2;
+            case 'Depth'
+                Depth = varargin{index+1};
                 index = index + 2;
             case {'Frames', 'frames', 'FrameIndex'}
                 FrameIndex = varargin{index+1};
@@ -150,15 +154,15 @@ if iscellstr(Images) % filename input
     end
     Height = loadObj.Height;
     Width = loadObj.Width;
-    Depth = loadObj.Depth;
-    totalFrames = sum([loadObj.files(:).Frames]);
+    if loadObj.Depth == 1
+        totalFrames = sum([loadObj.files(:).Frames]);
+    else
+        totalFrames = sum(floor([loadObj.files(:).Frames]/loadObj.Depth)+(rem([loadObj.files(:).Frames],loadObj.Depth)>=Depth));
+    end
 else % numeric array input
     loadType = false;
-    [Height, Width, Depth, ~, totalFrames] = size(Images);
+    [Height, Width, ~, ~, totalFrames] = size(Images);
     numFramesPerLoad = totalFrames;
-end
-if Depth > 1
-    error('Currently does not work for datasets with multiple z-planes');
 end
 
 % Create border
@@ -247,7 +251,7 @@ switch Mode
                 if bindex ~= 1
                     fprintf('\n');
                 end
-                [Images, loadObj] = load2P(ImageFiles, 'Type', 'Direct', 'Frames', currentFrames, 'Channel', Channel);
+                [Images, loadObj] = load2P(ImageFiles, 'Type', 'Direct', 'Frames', currentFrames, 'Channel', Channel, 'Depth', Depth);
             end
             
             % Remove border pixels
@@ -294,7 +298,7 @@ switch Mode
         parfor findex = FrameIndex
             
             % Load Frame
-            [img, loadObj] = load2P(ImageFiles, 'Type', 'Direct', 'Frames', findex, 'Channel', Channel, 'Verbose', false, 'double'); %direct
+            [img, loadObj] = load2P(ImageFiles, 'Type', 'Direct', 'Frames', findex, 'Channel', Channel, 'Depth', Depth, 'Verbose', false, 'double'); %direct
             
             % Remove border pixels
             if borderLims
@@ -337,7 +341,7 @@ switch Mode
         parfor findex = FrameIndex
             
             % Load Frame
-            [img, loadObj] = load2P(ImageFiles, 'Type', 'Direct', 'Frames', findex, 'Channel', Channel, 'Verbose', false, 'double'); %direct
+            [img, loadObj] = load2P(ImageFiles, 'Type', 'Direct', 'Frames', findex, 'Channel', Channel, 'Depth', Depth, 'Verbose', false, 'double'); %direct
             
             % Remove border pixels
             if borderLims

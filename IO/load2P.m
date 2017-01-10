@@ -190,11 +190,12 @@ switch LoadType
         for index = 1:numFiles
             if  ~isempty(FrameIndex{index})
                 if Config(index).Depth>1
-                    depthID = idDepth(Config(index),'IndexType','absolute','Frames',FrameIndex{index},'Depths',Depths)'; % determine file indices of frames requested
-                    numFrames(index) = size(depthID,2);
+                    [depthID,relativeIndex] = idDepth(Config(index),'IndexType','absolute','Frames',FrameIndex{index},'Depths',Depths); % determine file indices of frames requested
+                    numFrames(index) = numel(relativeIndex);
+                    depthID = depthID';
                     FrameIndex{index} = sort(depthID(:))'; % list of frame indices to load
                     FrameIndex{index}(isnan(FrameIndex{index})) = []; % remove NaN's
-                    loadObj.FrameIndex = cat(1, loadObj.FrameIndex, cat(2, index*ones(size(depthID,2),1), depthID'));
+                    loadObj.FrameIndex = cat(1, loadObj.FrameIndex, cat(2, index*ones(numFrames(index),1), relativeIndex, depthID'));
                 else
                     numFrames(index) = numel(FrameIndex{index});
                     loadObj.FrameIndex = cat(1, loadObj.FrameIndex, cat(2, index*ones(numel(FrameIndex{index}),1), FrameIndex{index}'));
@@ -233,7 +234,7 @@ switch LoadType
         
         if numFiles > 1
             warning('Cannot load more than one file with MemMap. Loading first file...');
-            numFiles = 1;
+            % numFiles = 1;
             Config = Config(1);
             ImageFiles = ImageFiles(1);
             loadObj.files(2:end) = [];
