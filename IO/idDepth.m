@@ -36,7 +36,7 @@ end
 if ~exist('Config', 'var') || isempty(Config)
     [f,p] = uigetfile({'*.sbx;*.tif'}, 'Choose image file to analyze', directory);
     if isnumeric(f)
-        Frames = []; return
+        FrameIDs = []; RelativeIndex = []; return
     end
     Config = fullfile(p,f);
 end
