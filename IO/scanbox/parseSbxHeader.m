@@ -93,15 +93,15 @@ config.ZoomFactor = info.config.magnification;
 if info.scanbox_version>=2
     try
         if info.scanmode == 1
-            config.FrameRate = 15.45; % dependent upon mirror speed
+            config.FrameRate = 15.49; % dependent upon mirror speed
         else
-            config.FrameRate = 30;
+            config.FrameRate = 30.98;
         end
     catch
-        config.FrameRate = 15.45;
+        config.FrameRate = 15.49;
     end
 else
-    config.FrameRate = 15.45;
+    config.FrameRate = 15.49;
 end
 
 
