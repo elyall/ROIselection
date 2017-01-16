@@ -52,7 +52,8 @@ if Config.Depth == 1
     if Frames(end)==inf
         Frames = [Frames(1:end-2),Frames(end-1):Config.Frames]; % load all frames
     end
-    Frames = Frames';
+    FrameIDs = Frames';
+    RelativeIndex = FrameIDs;
     return
 end
 
