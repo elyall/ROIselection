@@ -191,5 +191,6 @@ if saveOut && ~isempty(saveFile)
     else
         save(saveFile, 'ROIdata', '-mat', '-append');
     end
+    fprintf('ROIdata saved to: %s\n',saveFile);
 end
 

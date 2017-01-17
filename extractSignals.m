@@ -26,7 +26,7 @@ MotionCorrect = false;      % false, filename to load MCdata from, or true to pr
 Channel = 1;                % channel to extract data from
 Depth = 1;                  % depth to extract data from
 FrameIndex = [1, inf];      % vector of frame indices
-borderLims = [0,0,34,34];   % number of pixels to remove from edges when computing ROI means (top, bottom, left, right)
+borderLims = [0,0,4,0];   % number of pixels to remove from edges when computing ROI means (top, bottom, left, right)
 
 % Memory settings
 portionOfMemory = 0.08;     % find 10% or less works best
@@ -198,6 +198,10 @@ if numROIs == 0
     return
 end
 
+if any(arrayfun(@(x) isempty(x.mask),ROIdata.rois(ROIindex)))
+    error('%d ROIs don''t have masks created. Run ''createMasks'' first!',nnz(arrayfun(@(x) isempty(x.mask),ROIdata.rois(ROIindex))));
+end
+
 
 %% Determine frames to process
 if FrameIndex(end)==inf
@@ -298,7 +302,7 @@ switch Mode
         parfor findex = FrameIndex
             
             % Load Frame
-            [img, loadObj] = load2P(ImageFiles, 'Type', 'Direct', 'Frames', findex, 'Channel', Channel, 'Depth', Depth, 'Verbose', false, 'double'); %direct
+            [img, loadObj] = load2P(ImageFiles, 'Type', 'Direct', 'Frames', findex, 'Channel', Channel, 'Depth', Depth, 'double'); %direct
             
             % Remove border pixels
             if borderLims
