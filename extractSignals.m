@@ -345,7 +345,7 @@ switch Mode
         parfor findex = FrameIndex
             
             % Load Frame
-            [img, loadObj] = load2P(ImageFiles, 'Type', 'Direct', 'Frames', findex, 'Channel', Channel, 'Depth', Depth, 'Verbose', false, 'double'); %direct
+            [img, loadObj] = load2P(ImageFiles, 'Type', 'Direct', 'Frames', findex, 'Channel', Channel, 'Depth', Depth, 'double'); %direct
             
             % Remove border pixels
             if borderLims
