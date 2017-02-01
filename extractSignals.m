@@ -26,7 +26,7 @@ MotionCorrect = false;      % false, filename to load MCdata from, or true to pr
 Channel = 1;                % channel to extract data from
 Depth = 1;                  % depth to extract data from
 FrameIndex = [1, inf];      % vector of frame indices
-borderLims = [0,0,4,0];   % number of pixels to remove from edges when computing ROI means (top, bottom, left, right)
+borderLims = [0,0,4,0];     % number of pixels to remove from edges when computing ROI means, inclusive (top, bottom, left, right)
 
 % Memory settings
 portionOfMemory = 0.08;     % find 10% or less works best

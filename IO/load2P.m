@@ -44,6 +44,10 @@ elseif ischar(ImageFiles)
 elseif isstruct(ImageFiles)
     loadObj = ImageFiles;
 end
+
+if iscellstr(ImageFiles) && any(cellfun(@isempty, regexp(ImageFiles,'.[/w.sbx/w.tif]$')))
+    error('Make sure all files input are either .sbx or .tif files');
+end
 numFiles = numel(ImageFiles);
 
 index = 1;
