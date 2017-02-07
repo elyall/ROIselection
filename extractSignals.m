@@ -199,7 +199,8 @@ if numROIs == 0
 end
 
 if any(arrayfun(@(x) isempty(x.mask),ROIdata.rois(ROIindex)))
-    error('%d ROIs don''t have masks created. Run ''createMasks'' first!',nnz(arrayfun(@(x) isempty(x.mask),ROIdata.rois(ROIindex))));
+    warning('ROI masks did not exist for %d ROIs, running ''createMasks''...',nnz(arrayfun(@(x) isempty(x.mask),ROIdata.rois(ROIindex))));
+    [~,~,ROIdata] = createMasks(ROIdata);
 end
 
 
