@@ -19,15 +19,16 @@ function [Images, Config, InfoFile] = readSbx(SbxFile, varargin)
 
 
 % Default parameters that can be adjusted
-LoadType = 'Direct';% specifies how the data is loaded, can be: 'MemMap' or 'Direct'
-Frames = 1:20;      % indices of frames to load in 'Direct' mode, or 'all'
-Channels = 1;       % default channels to load
-Depths = inf;       % default depths to load
-Verbose = true;     % booleon determining whether to display progress bar
-invert = true;      % invert colormap boolean
-flipLR = false;     % flip images across vertical axis
-xavg = 4;           % scanbox version 1: number of pixels to average for each pixel
-organizeDepths=true;% booleon determining whether to reshape file with multiple depths into 5D matrix or leave frames interleaved
+LoadType = 'Direct';    % specifies how the data is loaded, can be: 'MemMap' or 'Direct'
+Frames = 1:20;          % indices of frames to load in 'Direct' mode, or 'all'
+IndexType = 'absolute'; % 'absolute' or 'relative' -> specifies whether 'Frames' indexes the absolute frame index or the relative frame index for the depth(s) requested (doesn't matter if only 1 depth in the file)
+Channels = 1;           % default channels to load
+Depths = inf;           % default depths to load
+Verbose = true;         % booleon determining whether to display progress bar
+invert = true;          % invert colormap boolean
+flipLR = false;         % flip images across vertical axis
+xavg = 4;               % scanbox version 1: number of pixels to average for each pixel
+organizeDepths=true;    % booleon determining whether to reshape file with multiple depths into 5D matrix or leave frames interleaved
 
 % Placeholders
 InfoFile = '';
@@ -46,6 +47,9 @@ while index<=length(varargin)
                 index = index + 2;
             case {'Frames','frames'} % indices of frames to load in 'Direct' mode
                 Frames = varargin{index+1};
+                index = index + 2;
+            case 'IndexType'
+                IndexType = varargin{index+1};
                 index = index + 2;
             case {'Channels','channels'}
                 Channels = varargin{index+1};
@@ -150,14 +154,15 @@ switch LoadType
         elseif Depths(end) == inf;
             Depths = [Depths(1:end-2),Depths(end-1):Config.Depth];
         end
-        numDepths = numel(Depths);
         
         % Determine indices within file to load
         if Config.Depth>1 % if Config.Depth==1 then frame indices is the same as the file indices
-            depthID = idDepth(Config,'IndexType','absolute','Frames',Frames,'Depths',Depths)';  % determine file indices of frames requested
+            depthID = idDepth(Config,'IndexType',IndexType,'Frames',Frames,'Depths',Depths)';  % determine file indices of frames requested
+            numDepths = sum(any(~isnan(depthID),2));
             Frames = sort(depthID(:));                                                          % list of frame indices to load
             Frames(isnan(Frames)) = []; % remove NaN's
         else
+            numDepths = 1;
             Frames = Frames';
         end
         numFrames = numel(Frames);

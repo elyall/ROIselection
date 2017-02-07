@@ -20,6 +20,7 @@ function [Images, loadObj, Config] = load2P(ImageFiles, varargin)
 
 LoadType = 'Direct'; % 'MemMap' or 'Direct' or 'Buffered' 
 Frames = [1, inf]; % indices of frames to load in 'Direct' mode, or 'all'
+IndexType = 'absolute';
 Channels = inf;
 Depths = inf;
 Double = false;
@@ -62,6 +63,9 @@ while index<=length(varargin)
                 index = index + 2;
             case {'Frames','frames','Frame','frame'} % indices of frames to load in 'Direct' mode
                 Frames = varargin{index+1};
+                index = index + 2;
+            case 'IndexType'
+                IndexType = varargin{index+1};
                 index = index + 2;
             case {'Channels', 'channels', 'Channel', 'channel'}
                 Channels = varargin{index+1};
@@ -194,13 +198,15 @@ switch LoadType
         for index = 1:numFiles
             if  ~isempty(FrameIndex{index})
                 if Config(index).Depth>1
-                    [depthID,relativeIndex] = idDepth(Config(index),'IndexType','absolute','Frames',FrameIndex{index},'Depths',Depths); % determine file indices of frames requested
+                    [depthID,relativeIndex] = idDepth(Config(index),'IndexType',IndexType,'Frames',FrameIndex{index},'Depths',Depths); % determine file indices of frames requested
                     numFrames(index) = numel(relativeIndex);
+                    numDepths = sum(any(~isnan(depthID),1));
                     depthID = depthID';
                     FrameIndex{index} = sort(depthID(:))'; % list of frame indices to load
                     FrameIndex{index}(isnan(FrameIndex{index})) = []; % remove NaN's
                     loadObj.FrameIndex = cat(1, loadObj.FrameIndex, cat(2, index*ones(numFrames(index),1), relativeIndex, depthID'));
                 else
+                    numDepths = 1;
                     numFrames(index) = numel(FrameIndex{index});
                     loadObj.FrameIndex = cat(1, loadObj.FrameIndex, cat(2, index*ones(numel(FrameIndex{index}),1), FrameIndex{index}'));
                 end
@@ -216,7 +222,7 @@ switch LoadType
                 switch loadObj.files(index).ext
                     case '.sbx'
                         Images(:,:,:,:,startFrame(index):startFrame(index)+numFrames(index)-1)...
-                            = readSbx(ImageFiles{index}, 'Type', 'Direct', 'Frames', FrameIndex{index}, 'Channels', Channels, 'Depth', Depths, 'Verbose', Verbose);
+                            = readSbx(ImageFiles{index}, 'Type', 'Direct', 'Frames', FrameIndex{index}, 'IndexType', IndexType, 'Channels', Channels, 'Depth', Depths, 'Verbose', Verbose);
                     case '.tif'
                         Images(:,:,:,:,startFrame(index):startFrame(index)+numFrames(index)-1)...
                             = readScim(ImageFiles{index}, 'Frames', FrameIndex{index}, 'Channels', Channels, 'Verbose', Verbose);
