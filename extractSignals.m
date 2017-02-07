@@ -199,7 +199,8 @@ if numROIs == 0
 end
 
 if any(arrayfun(@(x) isempty(x.mask),ROIdata.rois(ROIindex)))
-    error('%d ROIs don''t have masks created. Run ''createMasks'' first!',nnz(arrayfun(@(x) isempty(x.mask),ROIdata.rois(ROIindex))));
+    warning('ROI masks did not exist for %d ROIs, running ''createMasks''...',nnz(arrayfun(@(x) isempty(x.mask),ROIdata.rois(ROIindex))));
+    [~,~,ROIdata] = createMasks(ROIdata);
 end
 
 
@@ -299,7 +300,7 @@ switch Mode
         end
         
         % Cycle through frames
-        parfor findex = FrameIndex
+        for findex = FrameIndex
             
             % Load Frame
             [img, loadObj] = load2P(ImageFiles, 'Type', 'Direct', 'Frames', findex, 'IndexType', 'relative', 'Channel', Channel, 'Depth', Depth, 'double'); %direct
