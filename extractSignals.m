@@ -300,7 +300,7 @@ switch Mode
         end
         
         % Cycle through frames
-        for findex = FrameIndex
+        parfor findex = FrameIndex
             
             % Load Frame
             [img, loadObj] = load2P(ImageFiles, 'Type', 'Direct', 'Frames', findex, 'IndexType', 'relative', 'Channel', Channel, 'Depth', Depth, 'double'); %direct
