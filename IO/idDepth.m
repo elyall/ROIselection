@@ -1,9 +1,9 @@
-function [FrameIDs,RelativeIndex] = idDepth(Config,varargin)
+function [FrameIDs,RelativeIndex] = idDepth(totalDepths,totalFrames,varargin)
 
-Depths = [];
-Frames = [1,inf];
-IndexType = 'absolute'; % 'relative' or 'absolute'
-FramesPerDepth = 1;
+Depths = [];            % specifies which depths to return absolute frame indices for
+Frames = [1,inf];       % specifies which frames the user wants
+IndexType = 'absolute'; % 'relative' or 'absolute' -> determines whether index above is the absolute frame indices, or relative frame indices for each depth
+FramesPerDepth = 1;     % specifies number of frames taken at given depth before moving on to next depth
 directory = cd;
 
 %% Initialize Parameters
@@ -33,24 +33,28 @@ while index<=length(varargin)
     end
 end
 
-if ~exist('Config', 'var') || isempty(Config)
+if ~exist('totalDepths', 'var') || isempty(totalDepths)
     [f,p] = uigetfile({'*.sbx;*.tif'}, 'Choose image file to analyze', directory);
     if isnumeric(f)
         FrameIDs = []; RelativeIndex = []; return
     end
-    Config = fullfile(p,f);
+    totalDepths = fullfile(p,f);
 end
 
 
 %% Load in config
-if ischar(Config)
-    Config = load2PConfig(Config);
+if ischar(totalDepths)
+    totalDepths = load2PConfig(totalDepths);
+end
+if isstruct(totalDepths)
+    totalFrames = totalDepths.Frames;
+    totalDepths = totalDepths.Depth;
 end
 
 % In case where there is only one depth, skip the nonsense
-if Config.Depth == 1
+if totalDepths == 1
     if Frames(end)==inf
-        Frames = [Frames(1:end-2),Frames(end-1):Config.Frames]; % load all frames
+        Frames = [Frames(1:end-2),Frames(end-1):totalFrames]; % load all frames
     end
     FrameIDs = Frames';
     RelativeIndex = FrameIDs;
@@ -61,20 +65,20 @@ end
 %% Determine id of requested frames
 
 % Determine cycle parameters
-CycleSize = FramesPerDepth * Config.Depth;                  % number of frames in single cycle
-Cycle = reshape(1:CycleSize,FramesPerDepth,Config.Depth);   % frame index corresponding to frame 1:FramesPerDepth of each depth
+CycleSize = FramesPerDepth * totalDepths;                  % number of frames in single cycle
+Cycle = reshape(1:CycleSize,FramesPerDepth,totalDepths);   % frame index corresponding to frame 1:FramesPerDepth of each depth
 
 % Determine frame indices
 switch IndexType
     case 'relative'
 
         % Determine relative frames to use
-        if rem(Config.Frames,CycleSize)                                                                     % last cycle didn't complete
-            [RelativeIndicesInLastCycle,~] = find(Cycle<=rem(Config.Frames,CycleSize));                     % relative indices of frames in last cycle
+        if rem(totalFrames,CycleSize)                                                                     % last cycle didn't complete
+            [RelativeIndicesInLastCycle,~] = find(Cycle<=rem(totalFrames,CycleSize));                     % relative indices of frames in last cycle
         else
             RelativeIndicesInLastCycle = 0;                                                                 % last cycle completed
         end
-        maxRelativeIndex = FramesPerDepth*floor(Config.Frames/CycleSize)+max(RelativeIndicesInLastCycle);   % maximum relative index in file
+        maxRelativeIndex = FramesPerDepth*floor(totalFrames/CycleSize)+max(RelativeIndicesInLastCycle);   % maximum relative index in file
         if Frames(end) == inf
             Frames = [Frames(1:end-2),Frames(end-1):maxRelativeIndex];                                      % use all frames
         end
@@ -85,7 +89,7 @@ switch IndexType
         
         % Determine absolute frames to use
         if Frames(end) == inf
-            Frames = [Frames(1:end-2),Frames(end-1):Config.Frames]; % use all frames
+            Frames = [Frames(1:end-2),Frames(end-1):totalFrames]; % use all frames
         end
         
         % Determine relative indices of frames requested
@@ -102,7 +106,7 @@ FrameIDs = bsxfun(@plus, floor((RelativeIndex-1)/FramesPerDepth)*CycleSize,Cycle
 
 switch IndexType
     case 'relative'
-        FrameIDs(FrameIDs>Config.Frames) = nan;     % remove frames that don't exist (occurs if last cycle wasn't complete)
+        FrameIDs(FrameIDs>totalFrames) = nan;     % remove frames that don't exist (occurs if last cycle wasn't complete)
     case 'absolute'
         FrameIDs(~ismember(FrameIDs,Frames)) = nan; % remove indices that aren't requested
 end

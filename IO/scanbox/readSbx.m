@@ -157,7 +157,7 @@ switch LoadType
         
         % Determine indices within file to load
         if Config.Depth>1 % if Config.Depth==1 then frame indices is the same as the file indices
-            depthID = idDepth(Config,'IndexType',IndexType,'Frames',Frames,'Depths',Depths)';  % determine file indices of frames requested
+            depthID = idDepth(Config,[],'IndexType',IndexType,'Frames',Frames,'Depths',Depths)';  % determine file indices of frames requested
             numDepths = sum(any(~isnan(depthID),2));
             Frames = sort(depthID(:));                                                          % list of frame indices to load
             Frames(isnan(Frames)) = []; % remove NaN's
