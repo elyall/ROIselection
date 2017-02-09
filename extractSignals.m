@@ -372,7 +372,7 @@ end %Mode
 if verbose
     parfor_progress(0);
 end
-fprintf('\nFinished extracting signals for %d ROI(s) from %d frame(s)\nSession took: %.1f minutes\n', numROIs, numFrames, toc/60)
+fprintf('\tComplete.\tSession took: %.1f minutes\n', toc/60)
 
 
 %% Distribute data to structure

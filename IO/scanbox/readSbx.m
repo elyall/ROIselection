@@ -1,34 +1,60 @@
 function [Images, Config, InfoFile] = readSbx(SbxFile, varargin)
-%READSBX   Load .sbx files
-%   Images = readSbx() will prompt user to select a file to load.
+%READSBX   Loads .sbx files
+%   Images = readSbx() will prompt user to select a sbx file to load and
+%   returns the first 20 frames from that file.
 %
-%   [Images, Config, InfoFile] = readSbx(SbxFile) loads in the first
-%   default number of frames from the sbx file input, and returns the
-%   metadata and filename of associated info file.
+%   [Images, Config, InfoFile] = readSbx(SBXFILE) loads in the first 20
+%   frames from the sbx file FILENAME, and returns the metadata and
+%   filename of the metadata file.
 %
-%   Images = readSbx(..., 'Frames', X) loads in specific frames from file.
-%   Set X equal to inf to load in all frames.
+%   Images = readSbx(..., 'Frames', FRAMES) a vector that specifies the
+%   exact frame indices to load from the file. Set the end of X equal to
+%   inf to load to the end of the file. (default = 1:20)
 %
-%   Images = readSbx(..., 'Depths', Y) loads in specific depths from file.
-%   Set Y equal to inf to load in all depths.
+%   Images = readSbx(..., 'Depths', DEPTHS) a vector that specifies the
+%   depths to load from the file. (default = inf)
 %
-%   Images = readSbx(..., 'Channels', Z) loads in all Channels, but then
-%   throws out all Channels except those requested (would take much much
-%   longer to just load a specific channel, as channels are interleaved
-%   every 16 bits).
+%   Images = readSbx(..., 'Channels', CHANNELS) a vector that specifies
+%   which channels to include in the output. (default = 1) (Note: all
+%   channels are loaded into memory due to the channels being interleaved
+%   at the 16-bit scale causing a burden to do so otherwise)
+%
+%   Images = readSbx(..., 'IndexType', TYPE) 'absolute' or 'relative' that
+%   sets whether the frame indices specified are absolute indices, or
+%   relative to the depths requested. (default = 'absolute')
+%
+%   Images = readSbx(..., 'InfoFile', INFOFILENAME) specifies a specific
+%   metadata file to use. (default = [SBXFILE(1:end-3),'mat'])
+%
+%   Images = readSbx(..., 'Type', LOADTYPE) 'Direct' or 'MemMap' specifies
+%   whether the frames should be memory mapped or loaded directly into
+%   memory. (default = 'Direct')
+%
+%   Images = readSbx(..., 'flip') toggles flipping the images across the
+%   vertical axis. (default = false)
+%
+%   Images = readSbx(..., 'invert') toggles inverting the colormap.
+%   (default = true, because PMTs produce a negative signal)
+%
+%   Images = readSbx(..., 'verbose') toggles visual loading bar. (default =
+%   true)
+%
+%   Images = readSbx(..., 'organizeDepths') toggles whether different
+%   depths should be de-interleaved in the output. (default = true)
+%
 
 
 % Default parameters that can be adjusted
 LoadType = 'Direct';    % specifies how the data is loaded, can be: 'MemMap' or 'Direct'
-Frames = 1:20;          % indices of frames to load in 'Direct' mode, or 'all'
+Frames = 1:20;          % indices of frames to load in 'Direct' mode
 IndexType = 'absolute'; % 'absolute' or 'relative' -> specifies whether 'Frames' indexes the absolute frame index or the relative frame index for the depth(s) requested (doesn't matter if only 1 depth in the file)
 Channels = 1;           % default channels to load
 Depths = inf;           % default depths to load
 Verbose = true;         % booleon determining whether to display progress bar
 invert = true;          % invert colormap boolean
 flipLR = false;         % flip images across vertical axis
-xavg = 4;               % scanbox version 1: number of pixels to average for each pixel
 organizeDepths=true;    % booleon determining whether to reshape file with multiple depths into 5D matrix or leave frames interleaved
+xavg = 4;               % scanbox version 1: number of pixels to average for each pixel
 
 % Placeholders
 InfoFile = '';
@@ -58,17 +84,17 @@ while index<=length(varargin)
                 Depths = varargin{index+1};
                 index = index + 2;
             case {'Invert', 'invert'}
-                invert = varargin{index+1};
-                index = index + 2;
+                invert = ~invert;
+                index = index + 1;
             case {'Flip', 'flip'}
-                flipLR = varargin{index+1};
-                index = index + 2;
+                flipLR = ~flipLR;
+                index = index + 1;
             case 'organizeDepths'
-                organizeDepths = varargin{index+1};
-                index = index + 2;
+                organizeDepths = ~organizeDepths;
+                index = index + 1;
             case {'Verbose', 'verbose'}
-                Verbose = varargin{index+1};
-                index = index + 2;
+                Verbose = ~Verbose;
+                index = index + 1;
             otherwise
                 warning('Argument ''%s'' not recognized',varargin{index});
                 index = index + 1;

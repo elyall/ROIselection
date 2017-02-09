@@ -106,7 +106,7 @@ ROIMasks(repmat(overlap, 1, 1, numROIs)) = 0;      % remove regions of overlap f
 
 
 %% Create neuropil masks
-fprintf('Creating ROI & Neuropil masks...\n');
+fprintf('Creating ROI & Neuropil masks...');
 countMatrix = logical(countMatrix);
 NeuropilMasks = false(H,W,numROIs);
 switch neuropiltype
@@ -147,7 +147,7 @@ switch neuropiltype
         end
 
 end %switch neuropiltype
-fprintf('Complete\n');
+fprintf('\tComplete\n');
 
 
 %% Select a subsampling of neuropil pixels to ensure an equal signal to noise
@@ -191,6 +191,6 @@ if saveOut && ~isempty(saveFile)
     else
         save(saveFile, 'ROIdata', '-mat', '-append');
     end
-    fprintf('ROIdata saved to: %s\n',saveFile);
+    fprintf('\tROIdata saved to: %s\n',saveFile);
 end
 
