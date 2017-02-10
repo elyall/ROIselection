@@ -1,9 +1,36 @@
 function [FrameIDs,RelativeIndex] = idDepth(totalDepths,totalFrames,varargin)
+%IDDEPTH    determines the absolute frame index for each depth
+%   ID = idDepth(D,F) for a file that has D depths and F frames, returns a
+%   matrix ID of dimensions [ceil(F/D) x D], where each column corresponds to
+%   the actual frame indices of the frames taken at that depth, and each
+%   row is the relative frame for that depth. (e.g. ID(4,3) is absolute
+%   frame index of the fourth frame taken at depth 3)
+%
+%   ID = idDepth(...,'Frames',FRAMES) is a vector specifying which frame
+%   indices to return matrix ID for. (default = [1 inf])
+%
+%   ID = idDepth(...,'Depths',Z) returns ID with only columns Z. Leave Z
+%   empty for all columns. (default = [])
+%
+%   ID = idDepth(...,'IndexType',INDEXTYPE) 'absolute' or 'relative' that
+%   sets whether the frame indices specified are absolute indices, or
+%   relative to the depths requested. (default = 'absolute')
+%
+%   [ID,R] = idDepth(...) returns column-vector R that is equal in length
+%   to the height of ID, and specifies the relative index each row of ID.
+%
+%   [...] = idDepth(...,'FramesPerDepth',FPD) specifies how many frames
+%   were taken at each depth before moving to the next depth.
+%
 
-Depths = [];            % specifies which depths to return absolute frame indices for
+
+% Default parameters that can be adjusted
 Frames = [1,inf];       % specifies which frames the user wants
 IndexType = 'absolute'; % 'relative' or 'absolute' -> determines whether index above is the absolute frame indices, or relative frame indices for each depth
+Depths = [];            % specifies which depths to return absolute frame indices for
 FramesPerDepth = 1;     % specifies number of frames taken at given depth before moving on to next depth
+
+% Placeholders
 directory = cd;
 
 %% Initialize Parameters

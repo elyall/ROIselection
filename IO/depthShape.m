@@ -1,10 +1,42 @@
-function Images = depthShape(Images,Frames,depthID)
+function Images = depthShape(Images,Frames,depthID,varargin)
+%DEPTHSHAPE De-interleaves frames of different depths
+%   IMAGES = depthShape(IMAGES,FRAMES,DEPTHID) reshapes IMAGES of dimension
+%   [H x W x 1 x C x F*D] into [H x W x D x C x F]. FRAMES is a vector
+%   specifying the absolute frame index of each frame in IMAGES. DEPTHID is
+%   a matrix returned by idDepth for absolute indices FRAMES specifying the
+%   absolute frame index of each relative frame for each depth (see
+%   idDepth).
+%
+%   IMAGES = depthShape(...,'FramesPerDepth',FPD) specifies how many frames
+%   were taken at each depth before moving to the next depth.
+%
 
-standard = true; % booleon specifying whether cycle is continuous (acquisition frame order is 1,2,...,N,1,2,...,N)
 
+% Default parameters that can be adjusted
+FramesPerDepth = 1; % specifies number of frames taken at given depth before moving on to next depth
+
+%% Initialize Parameters
+index = 1;
+while index<=length(varargin)
+    try
+        switch varargin{index}
+            case 'FramesPerDepth'
+                FramesPerDepth = varargin{index+1};
+                index = index + 2;
+            otherwise
+                warning('Argument ''%s'' not recognized',varargin{index});
+                index = index + 1;
+        end
+    catch
+        warning('Argument %d not recognized',index);
+        index = index + 1;
+    end
+end
+
+
+%% De-interleave different depths
 Dim = size(Images);
-
-if standard % section is continuous -> simple reshape 
+if FramesPerDepth==1 % section is continuous -> simple reshape 
     F = find(isnan(depthID'));  % locate nonexistent frames
     for ii = 1:numel(F)         % add in blank frames
         if F(ii) == 1
@@ -26,3 +58,4 @@ else % data is discontinuous
     end
     Images = out;
 end
+

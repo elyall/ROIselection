@@ -1,4 +1,7 @@
 function [ROIMasks, NeuropilMasks, ROIdata] = createMasks(ROIMasks, varargin)
+%CREATEMASKS    Determines the pixels to average over for each ROI and its
+%neuropil signal.
+%
 
 neuropiltype = 'dilation'; % 'sbx' or 'dilation'
 ROIdata = [];

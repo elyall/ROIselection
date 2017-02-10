@@ -1,46 +1,43 @@
 function [Images, Config, InfoFile] = readSbx(SbxFile, varargin)
 %READSBX   Loads .sbx files
-%   Images = readSbx() will prompt user to select a sbx file to load and
+%   IMAGES = readSbx() will prompt user to select a sbx file to load and
 %   returns the first 20 frames from that file.
 %
-%   [Images, Config, InfoFile] = readSbx(SBXFILE) loads in the first 20
-%   frames from the sbx file FILENAME, and returns the metadata and
+%   [IMAGES, CONFIG, INFOFILE] = readSbx(SBXFILE) loads in the first 20
+%   frames from the sbx file SBXFILE, and returns the metadata and
 %   filename of the metadata file.
 %
-%   Images = readSbx(..., 'Frames', FRAMES) a vector that specifies the
+%   [...] = readSbx(..., 'Frames', FRAMES) a vector that specifies the
 %   exact frame indices to load from the file. Set the end of X equal to
 %   inf to load to the end of the file. (default = 1:20)
 %
-%   Images = readSbx(..., 'Depths', DEPTHS) a vector that specifies the
+%   [...] = readSbx(..., 'Depths', DEPTHS) a vector that specifies the
 %   depths to load from the file. (default = inf)
 %
-%   Images = readSbx(..., 'Channels', CHANNELS) a vector that specifies
+%   [...] = readSbx(..., 'Channels', CHANNELS) a vector that specifies
 %   which channels to include in the output. (default = 1) (Note: all
-%   channels are loaded into memory due to the channels being interleaved
-%   at the 16-bit scale causing a burden to do so otherwise)
+%   channels are initially loaded into memory due to the channels being
+%   interleaved at the 16-bit scale causing a burden to do so otherwise)
 %
-%   Images = readSbx(..., 'IndexType', TYPE) 'absolute' or 'relative' that
+%   [...] = readSbx(..., 'IndexType', TYPE) 'absolute' or 'relative' that
 %   sets whether the frame indices specified are absolute indices, or
 %   relative to the depths requested. (default = 'absolute')
 %
-%   Images = readSbx(..., 'InfoFile', INFOFILENAME) specifies a specific
+%   [...] = readSbx(..., 'InfoFile', INFOFILENAME) specifies a specific
 %   metadata file to use. (default = [SBXFILE(1:end-3),'mat'])
 %
-%   Images = readSbx(..., 'Type', LOADTYPE) 'Direct' or 'MemMap' specifies
+%   [...] = readSbx(..., 'Type', LOADTYPE) 'Direct' or 'MemMap' specifying
 %   whether the frames should be memory mapped or loaded directly into
 %   memory. (default = 'Direct')
 %
-%   Images = readSbx(..., 'flip') toggles flipping the images across the
-%   vertical axis. (default = false)
+%   [...] = readSbx(..., 'fliplr') flips images across the vertical axis.
 %
-%   Images = readSbx(..., 'invert') toggles inverting the colormap.
-%   (default = true, because PMTs produce a negative signal)
+%   [...] = readSbx(..., 'invert') inverts the colormap.
 %
-%   Images = readSbx(..., 'verbose') toggles visual loading bar. (default =
-%   true)
+%   [...] = readSbx(..., 'verbose') displays loading bar. (default=on)
 %
-%   Images = readSbx(..., 'organizeDepths') toggles whether different
-%   depths should be de-interleaved in the output. (default = true)
+%   [...] = readSbx(..., 'organizeDepths') de-interleaves different depths.
+%   (default=on)
 %
 
 
@@ -51,7 +48,7 @@ IndexType = 'absolute'; % 'absolute' or 'relative' -> specifies whether 'Frames'
 Channels = 1;           % default channels to load
 Depths = inf;           % default depths to load
 Verbose = true;         % booleon determining whether to display progress bar
-invert = true;          % invert colormap boolean
+invert = false;         % invert colormap boolean
 flipLR = false;         % flip images across vertical axis
 organizeDepths=true;    % booleon determining whether to reshape file with multiple depths into 5D matrix or leave frames interleaved
 xavg = 4;               % scanbox version 1: number of pixels to average for each pixel
@@ -86,7 +83,7 @@ while index<=length(varargin)
             case {'Invert', 'invert'}
                 invert = ~invert;
                 index = index + 1;
-            case {'Flip', 'flip'}
+            case {'FlipLR', 'fliplr'}
                 flipLR = ~flipLR;
                 index = index + 1;
             case 'organizeDepths'
@@ -264,7 +261,7 @@ switch LoadType
             end
 
             % Flip colormap
-            if invert
+            if ~invert % PMTs give a negative signal, so not inverting colormap produces perceptually inverted colormap
                 Images = intmax('uint16') - Images;
             end
             

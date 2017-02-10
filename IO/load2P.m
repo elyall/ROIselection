@@ -1,31 +1,55 @@
 function [Images, loadObj, Config] = load2P(ImageFiles, varargin)
-% Loads 'Frames' of single .sbx, .tif, or .imgs file. Requires
-% corresponding information file ('InfoFile').
-% INPUTS:
-% 'ImageFiles' -> cell array of strings of filenames to load images from,
-% string specifying single filename to load images from, or blank to prompt
-% for file selection.
-% ARGUMENTS:
-% 'Type' -> follow with 'Direct' to load frames directly to RAM, or
-% 'MemMap' to use memory mapping. 
-% 'Frames' -> follow with vector specifying the frame indices to load, cell
-% array of a single vector specifying frame indices to load from each file,
-% or cell array of N vectors specifying the exact frame indices to load
-% from each of the N filenames input. For any vector, if last value is
-% 'inf' then it will load all frames. (default is [1, inf] which will load
-% all frames)
-% 'Channels' -> follow with vector of channel indices to load
-% 'Depths' -> follow with vector of depth indices to load
-% 'Double' -> makes output Images of class double
+%LOAD2P    Loads multiple .sbx or .tif files.
+%   IMAGES = load2P() will prompt user to select a sbx file to load and
+%   returns the first 20 frames from that file.
+%
+%   [IMAGES, LOADOBJ, CONFIG] = load2P(IMAGEFILES) loads in the first 20
+%   frames from IMAGEFILES, the location of a single file or a cell array
+%   of strings containing multiple filenames. LOADOBJ is a struct detailing
+%   the data loaded in IMAGES. CONFIG is the metadata for all files located
+%   in IMAGEFILES.
+%
+%   [...] = load2P(..., 'Frames', FRAMES) a vector that specifies the exact
+%   frame indices to load from the file. Set the end of X equal to inf to
+%   load to the end of the file. (default = 1:20)
+%
+%   [...] = load2P(..., 'Depths', DEPTHS) a vector that specifies the
+%   depths to load from the file. (default = inf)
+%
+%   [...] = load2P(..., 'Channels', CHANNELS) a vector that specifies which
+%   channels to include in the output. (default = 1) (Note: all channels
+%   are initially loaded into memory due to the channels being interleaved
+%   at the 16-bit scale causing a burden to do so otherwise)
+%
+%   [...] = load2P(..., 'IndexType', TYPE) 'absolute' or 'relative' that
+%   sets whether the frame indices specified are absolute indices, or
+%   relative to the depths requested. (default = 'absolute')
+%
+%   [...] = load2P(..., 'Save', X) empty string to not save images to a
+%   file, true to prompt for a filename to save to, or a string specifying
+%   the filename to save the images to (will also prompt user if file
+%   already exists). (default = '')
+%
+%   [...] = load2P(..., 'Type', LOADTYPE) 'Direct' or 'MemMap' specifying
+%   whether the frames should be memory mapped or loaded directly into
+%   memory. (default = 'Direct')
+%
+%   [...] = load2P(..., 'double') forces IMAGES to be of class 'double'.
+%
+%   [...] = load2P(..., 'verbose') displays loading bar.
+%
 
-LoadType = 'Direct'; % 'MemMap' or 'Direct' or 'Buffered' 
-Frames = [1, inf]; % indices of frames to load in 'Direct' mode, or 'all'
-IndexType = 'absolute';
-Channels = inf;
-Depths = inf;
-Double = false;
-SaveToMat = false;
-Verbose = false;
+% Default parameters that can be adjusted
+LoadType = 'Direct';    % 'MemMap' or 'Direct' 
+Frames = 1:20;          % indices of frames to load in 'Direct' mode
+IndexType = 'absolute';	% 'absolute' or 'relative' -> specifies whether 'Frames' indexes the absolute frame index or the relative frame index for the depth(s) requested (doesn't matter if only 1 depth in the file)
+Channels = 1;           % default channels to load
+Depths = inf;           % default depths to load
+Double = false;         % booleon determining whether output images are forced to be of class double
+Verbose = false;        % booleon determining whether to display progress bar
+SaveFile = '';          % empty string, True to prompt for filename selection, or filename of file to save images to
+
+% Placeholders
 directory = cd;
 
 %% Initialize Parameters
@@ -73,8 +97,11 @@ while index<=length(varargin)
             case {'Depths', 'depths', 'Depth', 'depth'}
                 Depths = varargin{index+1};
                 index = index + 2;
+            case {'Save','save','saveFile'}
+                SaveFile = varargin{index+1};
+                index = index + 2;
             case {'Double', 'double'}
-                Double = true;
+                Double = ~Double;
                 index = index + 1;
             case {'Verbose', 'verbose'}
                 Verbose = ~Verbose;
@@ -272,17 +299,31 @@ loadObj.size = [loadObj.Height, loadObj.Width, loadObj.Depth, loadObj.Channels, 
 
 loadObj.FrameRate = mode([Config(:).FrameRate]);
 
-%% Save Images
-if SaveToMat
-    [p,f,~] = fileparts(ImageFiles{index});
-    SaveFile = fullfile(p, [f,'.mat']); % automatically create filename to save to
-    if exist('SaveFile', 'file') % if file previously exists, prompt for filename
-        [SaveFile, p] = uiputfile({'.mat'}, 'Save images as:', p);
+
+%% Save Images to file
+if ~isempty(SaveFile)
+    
+    % Determine filename
+    if isequal(SaveFile,true) || exist('SaveFile', 'file') % if file previously exists, prompt for filename
+        if isequal(SaveFile,true) % set filename to be default filename
+            [p,f,~] = fileparts(ImageFiles{1});
+            SaveFile = fullfile(p, [f,'.mat']); 
+        end
+        [SaveFile, p] = uiputfile({'*.mat;*.tif;*.sbx'}, 'Save images as:', SaveFile); % have user select the file
+        if isnumeric(SaveFile)  % user hit cancel
+            return              % return outputs without saving images to file
+        end
         SaveFile = fullfile(p,SaveFile);
     end
+    
+    % Save images to file
     [~,~,ext] = fileparts(SaveFile);
     switch ext
         case '.mat'
             save(SaveFile, 'Images', 'Config', 'numFrames', 'info', '-v7.3');
+        otherwise
+            save2P(SaveFile,Images);
     end
+    
 end
+

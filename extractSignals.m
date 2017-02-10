@@ -1,22 +1,46 @@
 function [ROIdata, Data, Neuropil, ROIindex] = extractSignals(Images, ROIdata, ROIindex, varargin)
-% [ROIdata, Data, Neuropil, ROIindex] = extractSignals(Images, ROIdata, ROIid, varargin)
-% INPUTS:
-% Images - images or filename(s) (cell array of strings or string)
-% ROIdata - ROIdata (struct) or filename (string)
-% ROIid - indices of ROIs within ROIdata to average or 'all' or 'new'
-% ARGUMENTS:
-% 'GPU' - performs computations on the GPU
-% 'save' - saves output 'ROIdata' struct to file
-% 'saveFile' - follow with the filename of the file to save to (defaults to
-% ROIFile input if a filename is input for second input)
-% 'loadType' - follow with 'MemMap' or 'Direct' to specify how to load the
-% image files when a filename is input as the first input
-% 'MotionCorrect' - follow with 'MCdata' structure, filename of mat file to
-% load 'MCdata' structure from, or true to prompt for file selection
-% 'Frames' - follow with vector specifying indices of frames to analyze.
-% Last value can be 'inf', specifying to analyze all frames after the
-% previous designated frame (ex: default is [1, inf] specifying all
-% frames).
+%EXTRACTSIGNALS Averages over all pixels within each ROI over time.
+%   ROIdata = extractSignals() prompts user to select an images file, ROI
+%   file, and averages over all ROIs for all time points. Returns ROIdata
+%   with added sub-fields rois.rawdata and rois.rawneuropil.
+%
+%   ROIdata = extractSignals(IMAGES, ROIdata) averages all ROIs for all
+%   time points in IMAGES. IMAGES can be a filename, a cell array of
+%   strings specifying multiple files, or a matrix of dimension [H x W x D
+%   x C x F]. ROIdata can be a string or an ROIdata struct.
+%
+%   ROIdata = extractSignals(...,ROIINDEX) averages over only ROIs
+%   specified in ROIINDEX.
+%
+%   [ROIdata, DATA, NEUROPIL, ROIINDEX] = extractSignals(...) returns
+%   matrices DATA and NEUROPIL of dimensions [numROIs x numFrames]
+%   containing the rawdata and rawneuropil signals for all ROIs requested.
+%   Also returns vector ROIINDEX of length numROIs which specifies the ROI
+%   which specifies the ROI indices for each row of DATA and NEUROPIL.
+%   
+%   [...] = extractSignals(...,'verbose') displays status bar.
+%
+%   Other parameters can be specified via:
+%   [...] = extractSignals(...,'PARAM1','VALUE1',...)
+%   Parameters      Value 
+%   'Mode'          'Cell', 'GPU', or 'SPARSE' specifying which method to 
+%                   use to average over ROIs. (default = 'Cell')
+%   'loadType'      'MemMap' or 'Direct' specifying how to load IMAGES.
+%                   (default = 'Direct')
+%   'MotionCorrect' MCdata struct, filename to load MCdata struct from,
+%                   true to prompt for file selection, or false to not 
+%                   perform motion correction. (default = false)
+%   'Channel'       index of channel to average over. (default = 1)
+%   'Depth'         index of depth to average over. (default = 1)
+%   'Frames'        indices of frames to average for. (default = [1 inf])
+%   'border'        vector of length 4 specifying number of pixels to
+%                   ignore from [top, bottom, left, right]
+%   'Save'          true to save ROIdata to file, false to not. (default =
+%                   false)
+%   'SaveFile'      filename of file to save ROIdata to. (default is 
+%                   filename input if one is input)
+%
+
 
 Mode = 'Cell';              % 'GPU', 'Cell', 'Sparse'
 loadType = 'Direct';        % 'MemMap' or 'Direct'
@@ -26,13 +50,14 @@ MotionCorrect = false;      % false, filename to load MCdata from, or true to pr
 Channel = 1;                % channel to extract data from
 Depth = 1;                  % depth to extract data from
 FrameIndex = [1, inf];      % vector of relative frame indices for requested depth
-borderLims = [0,0,4,0];     % number of pixels to remove from edges when computing ROI means, inclusive (top, bottom, left, right)
+borderLims = [0,0,4,0];     % number of pixels to ignore from edges when computing ROI means, inclusive (top, bottom, left, right)
+verbose = false;            % booleon specifying whether to show status bar
 
 % Memory settings
 portionOfMemory = 0.08;     % find 10% or less works best
 sizeRAM = 32000000000;      % amount of memory on your computer (UNIX-only)
 
-verbose = false;
+% Placeholders
 directory = cd;
 
 %% Parse input arguments
