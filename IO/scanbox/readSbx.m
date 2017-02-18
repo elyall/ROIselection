@@ -90,8 +90,13 @@ while index<=length(varargin)
                 organizeDepths = ~organizeDepths;
                 index = index + 1;
             case {'Verbose', 'verbose'}
-                Verbose = ~Verbose;
-                index = index + 1;
+                if length(varargin)>index && islogical(varargin{index+1})
+                    Verbose = varargin{index+1};
+                    index = index + 2;
+                else
+                    Verbose = ~Verbose;
+                    index = index + 1;
+                end
             otherwise
                 warning('Argument ''%s'' not recognized',varargin{index});
                 index = index + 1;

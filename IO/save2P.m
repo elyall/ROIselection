@@ -22,10 +22,11 @@ function Filename = save2P(Filename,Images,varargin)
 %
 
 % Default parameters that can be adjusted
-Append = false; % booleon determing whether data is written to a new file (potentially overwriting existing file) or appended to existing one
-Header = '';    % metadata -> tif: string saved as header for each frame, bin: struct saved to corresponding mat-file
-invert = true;  % booleon determing whether to invert the colormap before saving
-Class = '';     % string specifying class to save the images as
+Append = false;  % booleon determing whether data is written to a new file (potentially overwriting existing file) or appended to existing one
+Header = '';     % metadata -> tif: string saved as header for each frame, bin: struct saved to corresponding mat-file
+invert = false;  % booleon determing whether to invert the colormap before saving
+Class = 'uint16';% string specifying class to save the images as
+CLim = [];       % vector of length 2 specifying the limits of the colormap
 
 % Placeholders
 directory = cd;
@@ -45,6 +46,12 @@ while index<=length(varargin)
             case {'Invert','invert'}
                 invert = ~invert;
                 index = index + 1;
+            case {'Class','class'}
+                Class = varargin{index+1};
+                index = index + 2;
+            case 'CLim'
+                CLim = varargin{index+1};
+                index = index + 2;
             otherwise
                 warning('Argument ''%s'' not recognized',varargin{index});
                 index = index + 1;
@@ -72,41 +79,75 @@ if ~exist('Images','var') || isempty(Images) % Prompt for file selection
 end
 
 
-%% Load images
+%% Load & adjust images
 if ischar(Images) || iscellstr(Images)
     Images = load2P(Images, 'Type', 'Direct'); % load images
 end
 
-% Set format
-if ~isempty(Class)
-    if ~isa(Images, Class)
-        switch Class
-            case 'uint8'
-                Images = uint8(Images);
-            case 'uint16'
-                Images = uint16(Images);
-            case 'uint32'
-                Images = uint32(Images);
-            case 'uint64'
-                Images = uint64(Images);
-            case 'single'
-                Images = single(Images);
-            case 'double'
-                Images = double(Images);
-        end
+% Format Images to be in 5D spec
+if ~ismatrix(Images)
+    while ndims(Images) < 5
+        Images = permute(Images, [1:ndims(Images)-1, ndims(Images)+1, ndims(Images)]);
     end
-end
-Class = class(Images);
-
-% Invert colormap
-if invert
-    Images = intmax(Class) - Images;
 end
 
 % Re-interleave depths
 [H,W,numZ,numC,numFrames] = size(Images);
 Images = permute(Images,[1,2,4,3,5]);
 Images = reshape(Images,H,W,numC,numZ*numFrames);
+
+% Set color limits
+if ~isempty(CLim)
+    if isempty(Class)
+        Class = class(Images);
+    end
+    Images = double(Images);
+    if isequal(CLim,true) % imagesc each frame
+        for findex = 1:numZ*numFrames
+            for cindex = 1:numC
+                temp = Images(:,:,cindex,findex);
+                Images(:,:,cindex,findex) = (temp-min(temp(:)))./range(temp(:));
+            end
+        end
+    else
+        Images = (Images - CLim(1))./diff(CLim);
+    end
+    Images(Images>1) = 1;
+    Images(Images<0) = 0;
+    switch Class
+        case {'single','double'}
+            Images = double(realmax(Class))*Images;
+        otherwise
+            Images = double(intmax(Class))*Images;
+    end
+end
+
+% Set format
+if ~isempty(Class) && ~isa(Images, Class)
+    switch Class
+        case 'logical'
+            Images = logical(Images);
+        case 'uint8'
+            Images = uint8(Images);
+        case 'uint16'
+            Images = uint16(Images);
+        case 'uint32'
+            Images = uint32(Images);
+        case 'double'
+            Images = double(Images);
+    end
+end
+Class = class(Images);
+
+% Invert colormap
+if invert
+    switch Class
+        case {'single','double'}
+            Images = realmax(Class) - Images;
+        otherwise
+            Images = intmax(Class) - Images;
+    end
+end
 
 
 %% Save images to file
@@ -124,6 +165,29 @@ switch ext
     
     case '.tif'
         
+        % Ensure works with TiffLib
+        if isa(Images,'single')
+            Images = uint32(Images);
+            Class = 'uint32';
+        elseif isa(Images,'uint64')
+            Images = double(Images);
+            Class = 'double';
+        end
+
+        % Determine number of bits
+        switch Class
+            case 'logical'
+                BitsPerSample = 1;
+            case 'uint8'
+                BitsPerSample = 8;
+            case 'uint16'
+                BitsPerSample = 16;
+            case 'uint32'
+                BitsPerSample = 32;
+            case 'double'
+                BitsPerSample = 64;
+        end
+        
         % Open file
         if Append
             tiffObject = Tiff(Filename,'a');
@@ -140,7 +204,7 @@ switch ext
                 tiffObject.setTag('ImageLength',H);
                 tiffObject.setTag('ImageWidth',W);
                 tiffObject.setTag('Photometric', Tiff.Photometric.MinIsBlack);
-                tiffObject.setTag('BitsPerSample', 16);
+                tiffObject.setTag('BitsPerSample', BitsPerSample);
                 tiffObject.setTag('SamplesPerPixel', 1);
                 tiffObject.setTag('PlanarConfiguration', Tiff.PlanarConfiguration.Chunky);
                 tiffObject.setTag('Software', 'MATLAB');
