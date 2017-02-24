@@ -50,7 +50,7 @@ Verbose = false;        % booleon determining whether to display progress bar
 SaveFile = '';          % empty string, True to prompt for filename selection, or filename of file to save images to
 
 % Placeholders
-directory = cd;
+directory = cd; % default directory when prompting user to select a file
 
 %% Initialize Parameters
 if ~exist('ImageFiles', 'var') || isempty(ImageFiles)

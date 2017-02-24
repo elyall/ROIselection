@@ -1,7 +1,7 @@
 function Filename = save2P(Filename,Images,varargin)
 %SAVE2P Saves images to .tif or .sbx file
-%   save2P() prompts user to select a filename to save to and select a .sbx
-%   or .tif file to load data from.
+%   FILENAME = save2P() prompts user to select a FILENAME to save to and
+%   select a .sbx or .tif file to load data from.
 %
 %   save2P(FILENAME,IMAGES) determines what the name of the file being
 %   saved to and the images being saved to it.
@@ -29,8 +29,7 @@ Class = 'uint16';% string specifying class to save the images as
 CLim = [];       % vector of length 2 specifying the limits of the colormap
 
 % Placeholders
-directory = cd;
-
+directory = cd; % default directory when prompting user to select a file
 
 %% Parse input arguments
 index = 1;
