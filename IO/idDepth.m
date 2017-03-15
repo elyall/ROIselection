@@ -133,7 +133,7 @@ FrameIDs = bsxfun(@plus, floor((RelativeIndex-1)/FramesPerDepth)*CycleSize,Cycle
 
 switch IndexType
     case 'relative'
-        FrameIDs(FrameIDs>totalFrames) = nan;     % remove frames that don't exist (occurs if last cycle wasn't complete)
+        FrameIDs(FrameIDs>totalFrames) = nan;       % remove frames that don't exist (occurs if last cycle wasn't complete)
     case 'absolute'
         FrameIDs(~ismember(FrameIDs,Frames)) = nan; % remove indices that aren't requested
 end
@@ -143,7 +143,8 @@ end
 if ~isempty(Depths)
     if all(ismember(Depths,1:size(FrameIDs,2)))
         FrameIDs = FrameIDs(:,Depths);
-        FrameIDs(all(isnan(FrameIDs),2),:) = []; % remove rows with all frames missing from requested depths
+        RelativeIndex(all(isnan(FrameIDs),2),:) = [];   % remove rows with all frames missing from requested depths
+        FrameIDs(all(isnan(FrameIDs),2),:) = [];        % remove rows with all frames missing from requested depths
     else
         warning('Depth index requested not contained within depth indices. Returning frame indices for all depths...');
     end
