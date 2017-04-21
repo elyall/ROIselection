@@ -1,10 +1,12 @@
 function Filename = save2P(Filename,Images,varargin)
-%SAVE2P Saves images to .tif or .sbx file
+%SAVE2P Saves images to .tif, .avi, or binary file
 %   FILENAME = save2P() prompts user to select a FILENAME to save to and
 %   select a .sbx or .tif file to load data from.
 %
-%   save2P(FILENAME,IMAGES) determines what the name of the file being
-%   saved to and the images being saved to it.
+%   save2P(FILENAME,IMAGES) sets the name of the file to save to and the
+%   images to save to it. Images can be 4D [Y,X,C,F] or 5D [Y,X,Z,C,F].
+%   FILENAME can specify a '.tif' file, a '.avi' file, or otherwise saves
+%   the data as a binary file.
 %
 %   save2P(...,'Header',HEADER) saves the metadata HEADER. For tif files
 %   HEADER should be a string, for sbx files HEADER should be a struct.
@@ -20,6 +22,9 @@ function Filename = save2P(Filename,Images,varargin)
 %   save2P(...,'invert') inverts the colormap of the data before saving it
 %   to file.
 %
+%   save2P(...,'frameRate',FRAMERATE) specifies the frame rate of the AVI
+%   file.
+%
 
 % Default parameters that can be adjusted
 Append = false;  % booleon determing whether data is written to a new file (potentially overwriting existing file) or appended to existing one
@@ -27,6 +32,7 @@ Header = '';     % metadata -> tif: string saved as header for each frame, bin: 
 invert = false;  % booleon determing whether to invert the colormap before saving
 Class = 'uint16';% string specifying class to save the images as
 CLim = [];       % vector of length 2 specifying the limits of the colormap
+frameRate = 15;  % avi only: scalar specifying frameRate of video
 
 % Placeholders
 directory = cd; % default directory when prompting user to select a file
@@ -50,6 +56,9 @@ while index<=length(varargin)
                 index = index + 2;
             case 'CLim'
                 CLim = varargin{index+1};
+                index = index + 2;
+            case 'frameRate'
+                frameRate = varargin{index+1};
                 index = index + 2;
             otherwise
                 warning('Argument ''%s'' not recognized',varargin{index});
@@ -91,9 +100,12 @@ if ~ismatrix(Images)
 end
 
 % Re-interleave depths
-[H,W,numZ,numC,numFrames] = size(Images);
-Images = permute(Images,[1,2,4,3,5]);
-Images = reshape(Images,H,W,numC,numZ*numFrames);
+if ndims(Images)==5
+    [H,W,numZ,numC,numFrames] = size(Images);
+    Images = permute(Images,[1,2,4,3,5]);
+    Images = reshape(Images,H,W,numC,numZ*numFrames);
+end
+[H,W,numC,numFrames] = size(Images);
 
 % Set color limits
 if ~isempty(CLim)
@@ -102,7 +114,7 @@ if ~isempty(CLim)
     end
     Images = double(Images);
     if isequal(CLim,true) % imagesc each frame
-        for findex = 1:numZ*numFrames
+        for findex = 1:numFrames
             for cindex = 1:numC
                 temp = Images(:,:,cindex,findex);
                 Images(:,:,cindex,findex) = (temp-min(temp(:)))./range(temp(:));
@@ -195,7 +207,7 @@ switch ext
         end
         
         % Write frames to file
-        for findex = 1:numFrames*numZ
+        for findex = 1:numFrames
             for cindex = 1:numC
                 if findex~=1 || cindex~=1
                     tiffObject.writeDirectory();
@@ -217,6 +229,18 @@ switch ext
         % Close file
         tiffObject.close();
         
+    case '.avi'
+        
+        vidObj = VideoWriter(Filename,'Motion JPEG AVI');   % initiate file
+        set(vidObj, 'FrameRate', frameRate);                % set frame rate
+        open(vidObj);                                       % open file
+        for findex = 1:numFrames
+            for cindex = 1:numC
+                writeVideo(vidObj, Images(:,:,cindex,findex)); % write frame
+            end
+        end
+        close(vidObj);                                      % close file
+
     otherwise % assumes binary file
         
         % Open file
