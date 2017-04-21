@@ -4,9 +4,9 @@ function Filename = save2P(Filename,Images,varargin)
 %   select a .sbx or .tif file to load data from.
 %
 %   save2P(FILENAME,IMAGES) sets the name of the file to save to and the
-%   images to save to it. Images can be 4D [Y,X,C,F] or 5D [Y,X,Z,C,F].
-%   FILENAME can specify a '.tif' file, a '.avi' file, or otherwise saves
-%   the data as a binary file.
+%   images to save to it. Images can be 2D [Y,X], 3D [Y,X,F], 4D [Y,X,C,F],
+%   or 5D [Y,X,Z,C,F]. FILENAME can specify a '.tif' file, a '.avi' file,
+%   or otherwise saves the data as a binary file.
 %
 %   save2P(...,'Header',HEADER) saves the metadata HEADER. For tif files
 %   HEADER should be a string, for sbx files HEADER should be a struct.
@@ -92,18 +92,15 @@ if ischar(Images) || iscellstr(Images)
     Images = load2P(Images, 'Type', 'Direct'); % load images
 end
 
-% Format Images to be in 5D spec
-if ~ismatrix(Images)
-    while ndims(Images) < 5
-        Images = permute(Images, [1:ndims(Images)-1, ndims(Images)+1, ndims(Images)]);
-    end
-end
-
-% Re-interleave depths
-if ndims(Images)==5
+% Format Images
+if ndims(Images)==3     % add channel slice
+    Images = permute(Images,[1,2,4,3]);
+elseif ndims(Images)==5 % re-interleave depths
     [H,W,numZ,numC,numFrames] = size(Images);
     Images = permute(Images,[1,2,4,3,5]);
     Images = reshape(Images,H,W,numC,numZ*numFrames);
+elseif ndims(Images)>5
+    error('Images must have less than 5 dimensions!');
 end
 [H,W,numC,numFrames] = size(Images);
 
