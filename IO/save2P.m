@@ -11,27 +11,31 @@ function Filename = save2P(Filename,Images,varargin)
 %   save2P(...,'Header',HEADER) saves the metadata HEADER. For tif files
 %   HEADER should be a string, for sbx files HEADER should be a struct.
 %   HEADER should be properly formatted if user wants to load the file
-%   without issue. Leave empty if don't want metadata saved (default='')
+%   without issue. Leave empty if don't want metadata saved. (default='')
 %
 %   save2P(...,'append') appends the IMAGES to the end of the file rather
 %   than overwriting the file.
 %
+%   save2P(...,'CLim',CLIM) either a 1x2 vector specifying the color limits
+%   to apply to IMAGES, or True to scale each frame to use the full
+%   colormap. (default=[])
+%
 %   save2P(...,'class',CLASS) string that sets IMAGES to be of class CLASS.
-%   (default='').
+%   (default='')
 %
 %   save2P(...,'invert') inverts the colormap of the data before saving it
 %   to file.
 %
 %   save2P(...,'frameRate',FRAMERATE) specifies the frame rate of the AVI
-%   file.
+%   file. (default=15)
 %
 
 % Default parameters that can be adjusted
-Append = false;  % booleon determing whether data is written to a new file (potentially overwriting existing file) or appended to existing one
 Header = '';     % metadata -> tif: string saved as header for each frame, bin: struct saved to corresponding mat-file
-invert = false;  % booleon determing whether to invert the colormap before saving
-Class = 'uint16';% string specifying class to save the images as
+Append = false;  % booleon determing whether data is written to a new file (potentially overwriting existing file) or appended to existing one
 CLim = [];       % vector of length 2 specifying the limits of the colormap
+Class = '';      % string specifying class to save the images as
+invert = false;  % booleon determing whether to invert the colormap before saving
 frameRate = 15;  % avi only: scalar specifying frameRate of video
 
 % Placeholders
@@ -89,11 +93,20 @@ end
 
 %% Load & adjust images
 if ischar(Images) || iscellstr(Images)
-    Images = load2P(Images, 'Type', 'Direct'); % load images
+    if all(contains(Images,{'.tif','.tiff','.sbx'}))
+        Images = load2P(Images, 'Type', 'Direct'); % load images
+    elseif all(contains(Images,'.align'))
+        Files = Images;
+        Images = [];
+        for findex = 1:numel(Files)
+            load(Files{findex},'m','-mat')
+            Images = cat(3,Images,m);
+        end
+    end
 end
 
 % Format Images
-if ndims(Images)==3     % add channel slice
+if ndims(Images)==3     % add channel dimension
     Images = permute(Images,[1,2,4,3]);
 elseif ndims(Images)==5 % re-interleave depths
     [H,W,numZ,numC,numFrames] = size(Images);
@@ -141,6 +154,8 @@ if ~isempty(Class) && ~isa(Images, Class)
             Images = uint16(Images);
         case 'uint32'
             Images = uint32(Images);
+        case 'single'
+            Images = single(Images);
         case 'double'
             Images = double(Images);
     end
@@ -173,7 +188,7 @@ switch ext
     
     case '.tif'
         
-        % Ensure works with TiffLib
+        % Ensure data works with TiffLib
         if isa(Images,'single')
             Images = uint32(Images);
             Class = 'uint32';
@@ -216,6 +231,9 @@ switch ext
                 tiffObject.setTag('SamplesPerPixel', 1);
                 tiffObject.setTag('PlanarConfiguration', Tiff.PlanarConfiguration.Chunky);
                 tiffObject.setTag('Software', 'MATLAB');
+                if strcmp(Class,'double')
+                    tiffObject.setTag('SampleFormat', Tiff.SampleFormat.IEEEFP);
+                end
                 if ~isempty(Header)
                     tiffObject.setTag('ImageDescription',Header);
                 end
@@ -228,6 +246,25 @@ switch ext
         
     case '.avi'
         
+        % Ensure data works with VideoWriter
+        if isa(Images,'uint16')
+            Images = single(Images);
+            Class = 'single';
+        elseif isa(Images,'uint32')
+            Images = single(Images);
+            Class = 'single';
+        elseif isa(Images,'uint64')
+            Images = double(Images);
+            Class = 'double';
+        end
+        
+        % Set to be between 0 and 1
+        if any(strcmp(Class,{'single','double'})) && (max(Images(:))>1 || min(Images(:))<0)
+            Images = Images - min(Images(:)); % set min to 0
+            Images = Images/max(Images(:));   % set max to 1
+        end
+        
+        % Write video
         vidObj = VideoWriter(Filename,'Motion JPEG AVI');   % initiate file
         set(vidObj, 'FrameRate', frameRate);                % set frame rate
         open(vidObj);                                       % open file
@@ -237,7 +274,18 @@ switch ext
             end
         end
         close(vidObj);                                      % close file
-
+    
+%     case 'hdf5'
+%         
+%         sizY = [Y,X,F];
+%         bin_width = round(512*512/prod(sizY)*4e3);
+%         nd = length(sizY)-1;
+%         sizY = sizY(1:nd);
+%         h5create(output_filename,'/mov',[sizY,Inf],'Chunksize',[sizY,bin_width],'Datatype',data_type);
+%         for t = 1:bin_width:T
+%         h5write(output_filename,'/mov',Ytm,[ones(1,nd),t],[sizY(1:nd),size(Ytm,3)]);
+%         end
+        
     otherwise % assumes binary file
         
         % Open file
@@ -256,12 +304,12 @@ switch ext
         % Close file
         fclose(fid);
         
-        % Save header file
+        % Save header file (sbx format)
         if ~isempty(Header)
             [p,f,~] = fileparts(Filename);
             HeaderFile = fullfile(p,[f '.mat']);
             info = Header;
-            save(HeaderFile, 'info', '-mat', '-v7.3');
+            save(HeaderFile, 'info', '-mat');
         end
         
 end %switch ext
