@@ -34,6 +34,7 @@ function Filename = save2P(Filename,Images,varargin)
 Header = '';     % metadata -> tif: string saved as header for each frame, bin: struct saved to corresponding mat-file
 Append = false;  % booleon determing whether data is written to a new file (potentially overwriting existing file) or appended to existing one
 CLim = [];       % vector of length 2 specifying the limits of the colormap
+MaxOutValue = [];% scalar specifying what to set the output max to be
 Class = '';      % string specifying class to save the images as
 invert = false;  % booleon determing whether to invert the colormap before saving
 frameRate = 15;  % avi only: scalar specifying frameRate of video
@@ -118,6 +119,10 @@ end
 [H,W,numC,numFrames] = size(Images);
 
 % Set color limits
+if isequal(CLim,true)
+%     CLim = [min(Images(:)),max(Images(:))];
+    CLim = prctile(Images(:), [.1,99.9]);
+end
 if ~isempty(CLim)
     if isempty(Class)
         Class = class(Images);
@@ -133,32 +138,23 @@ if ~isempty(CLim)
     else
         Images = (Images - CLim(1))./diff(CLim);
     end
-    Images(Images>1) = 1;
-    Images(Images<0) = 0;
-    switch Class
-        case {'single','double'}
-            Images = double(realmax(Class))*Images;
-        otherwise
-            Images = double(intmax(Class))*Images;
+    Images(Images>1) = 1; % with max at 1, rectify all larger values
+    Images(Images<0) = 0; % with min at 0, rectify all smaller values
+    if isempty(MaxOutValue)
+        switch Class
+            case {'single','double'}
+                Images = (double(realmax(Class))-1)*Images+1;
+            otherwise
+                Images = (double(intmax(Class))-1)*Images+1;
+        end
+    else
+        Images = (double(MaxOutValue)-1)*Images+1;
     end
 end
 
 % Set format
 if ~isempty(Class) && ~isa(Images, Class)
-    switch Class
-        case 'logical'
-            Images = logical(Images);
-        case 'uint8'
-            Images = uint8(Images);
-        case 'uint16'
-            Images = uint16(Images);
-        case 'uint32'
-            Images = uint32(Images);
-        case 'single'
-            Images = single(Images);
-        case 'double'
-            Images = double(Images);
-    end
+    Images = cast(Images, Class); % cast to desired format
 end
 Class = class(Images);
 
@@ -192,23 +188,42 @@ switch ext
         if isa(Images,'single')
             Images = uint32(Images);
             Class = 'uint32';
-        elseif isa(Images,'uint64')
+        elseif isa(Images,'uint64') || isa(Images,'int64')
             Images = double(Images);
             Class = 'double';
         end
 
-        % Determine number of bits
+        % Create Tiff metadata
+        meta.Photometric = Tiff.Photometric.MinIsBlack;
+        meta.ImageLength = H;
+        meta.ImageWidth = W;
+        meta.RowsPerStrip = H;
         switch Class
             case 'logical'
-                BitsPerSample = 1;
-            case 'uint8'
-                BitsPerSample = 8;
-            case 'uint16'
-                BitsPerSample = 16;
-            case 'uint32'
-                BitsPerSample = 32;
+                meta.BitsPerSample = 1;
+            case {'int8','uint8'}
+                meta.BitsPerSample = 8;
+            case {'int16','uint16'}
+                meta.BitsPerSample = 16;
+            case {'int32','uint32'}
+                meta.BitsPerSample = 32;
             case 'double'
-                BitsPerSample = 64;
+                meta.BitsPerSample = 64;
+        end
+        meta.Compression = Tiff.Compression.None;
+        switch Class
+            case {'logical','uint8','uint16','uint32'}
+                meta.SampleFormat = Tiff.SampleFormat.UInt;
+            case {'int8','int16','int32'}
+                meta.SampleFormat = Tiff.SampleFormat.Int;
+            case 'double'
+                meta.SampleFormat = Tiff.SampleFormat.IEEEFP;
+        end
+        meta.SamplesPerPixel = 1;
+        meta.PlanarConfiguration = Tiff.PlanarConfiguration.Chunky;
+        meta.Software = 'MATLAB';
+        if ~isempty(Header)
+            meta.ImageDescription = Header;
         end
         
         % Open file
@@ -217,27 +232,15 @@ switch ext
         else
             tiffObject = Tiff(Filename,'w');
         end
-        
+                
         % Write frames to file
         for findex = 1:numFrames
             for cindex = 1:numC
                 if findex~=1 || cindex~=1
                     tiffObject.writeDirectory();
                 end
-                tiffObject.setTag('ImageLength',H);
-                tiffObject.setTag('ImageWidth',W);
-                tiffObject.setTag('Photometric', Tiff.Photometric.MinIsBlack);
-                tiffObject.setTag('BitsPerSample', BitsPerSample);
-                tiffObject.setTag('SamplesPerPixel', 1);
-                tiffObject.setTag('PlanarConfiguration', Tiff.PlanarConfiguration.Chunky);
-                tiffObject.setTag('Software', 'MATLAB');
-                if strcmp(Class,'double')
-                    tiffObject.setTag('SampleFormat', Tiff.SampleFormat.IEEEFP);
-                end
-                if ~isempty(Header)
-                    tiffObject.setTag('ImageDescription',Header);
-                end
-                tiffObject.write(Images(:,:,cindex,findex));
+                tiffObject.setTag(meta);                     % set metadata for current directory
+                tiffObject.write(Images(:,:,cindex,findex)); % save current image
             end
         end
         
