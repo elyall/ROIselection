@@ -92,9 +92,14 @@ while index<=length(varargin)
             case {'borderLims','Border','border'}
                 borderLims = varargin{index+1};
                 index = index + 2;
-            case {'Verbose','verbose'}
-                verbose = true;
-                index = index + 1;
+            case {'Verbose', 'verbose'}
+                if length(varargin)>index && islogical(varargin{index+1})
+                    verbose = varargin{index+1};
+                    index = index + 2;
+                else
+                    verbose = ~verbose;
+                    index = index + 1;
+                end
             otherwise
                 warning('Argument ''%s'' not recognized',varargin{index});
                 index = index + 1;

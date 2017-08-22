@@ -47,7 +47,7 @@ Frames = 1:20;          % indices of frames to load in 'Direct' mode
 IndexType = 'absolute'; % 'absolute' or 'relative' -> specifies whether 'Frames' indexes the absolute frame index or the relative frame index for the depth(s) requested (doesn't matter if only 1 depth in the file)
 Channels = 1;           % default channels to load
 Depths = inf;           % default depths to load
-Verbose = true;         % booleon determining whether to display progress bar
+verbose = true;         % booleon determining whether to display progress bar
 invert = false;         % invert colormap boolean
 flipLR = false;         % flip images across vertical axis
 organizeDepths=true;    % booleon determining whether to reshape file with multiple depths into 5D matrix or leave frames interleaved
@@ -91,10 +91,10 @@ while index<=length(varargin)
                 index = index + 1;
             case {'Verbose', 'verbose'}
                 if length(varargin)>index && islogical(varargin{index+1})
-                    Verbose = varargin{index+1};
+                    verbose = varargin{index+1};
                     index = index + 2;
                 else
-                    Verbose = ~Verbose;
+                    verbose = ~verbose;
                     index = index + 1;
                 end
             otherwise
@@ -217,8 +217,8 @@ switch LoadType
         if(info.fid ~= -1)
             
             % Load Images
-            if Verbose
-                fprintf('Loading %7.d frame(s) from %s...', numFrames, SbxFile);
+            if verbose
+                fprintf('Loading   %7.d frame(s) from: %s...', numFrames, SbxFile);
                 t=tic;
             end
             
@@ -291,7 +291,7 @@ switch LoadType
         Config.size = size(Images); % update size of output
         
         
-        if Verbose
+        if verbose
             t=toc(t);
             if t<60
                 s = 'seconds';
