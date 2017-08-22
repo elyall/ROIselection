@@ -102,9 +102,9 @@ for bindex = 1:numFramesPerLoad:numFrames % direct loading only -> load frames i
     
     % Save to file
     if bindex==1
-        save2P(TifFile,Images);
+        save2P(TifFile,Images,'verbose');
     else
-        save2P(TifFile,Images,'append');
+        save2P(TifFile,Images,'append','verbose');
     end
     
     index = index + 1;
