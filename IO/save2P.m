@@ -31,13 +31,21 @@ function Filename = save2P(Filename,Images,varargin)
 %
 
 % Default parameters that can be adjusted
-Header = '';     % metadata -> tif: string saved as header for each frame, bin: struct saved to corresponding mat-file
-Append = false;  % booleon determing whether data is written to a new file (potentially overwriting existing file) or appended to existing one
-CLim = [];       % vector of length 2 specifying the limits of the colormap
-MaxOutValue = [];% scalar specifying what to set the output max to be
-Class = '';      % string specifying class to save the images as
-invert = false;  % booleon determing whether to invert the colormap before saving
-frameRate = 15;  % avi only: scalar specifying frameRate of video
+Header = '';          % metadata -> tif: string saved as header for each frame, bin: struct saved to corresponding mat-file
+Append = false;       % booleon determing whether data is written to a new file (potentially overwriting existing file) or appended to existing one
+CLim = [];            % vector of length 2 specifying the limits of the colormap
+MaxOutValue = [];     % scalar specifying what to set the output max to be
+Class = '';           % string specifying class to save the images as
+invert = false;       % booleon determing whether to invert the colormap before saving
+verbose = false;      % booleon specifying whether to inform user of status
+
+% AVI-only
+frameRate = 15;       % scalar specifying frameRate of video
+
+% HDF5-only (writes under root group: '/')
+DatasetName = 'data'; % string specifying name for the dataset to save to
+Channel = [];         % scalar specifying a single channel to save (save's data as 3D instead of 4D)
+ChunkSize = [];       % vector specifying the size of the chunks in each dimension (H,W,C,F or H,W,F if single channel is specified)
 
 % Placeholders
 directory = cd; % default directory when prompting user to select a file
@@ -62,8 +70,25 @@ while index<=length(varargin)
             case 'CLim'
                 CLim = varargin{index+1};
                 index = index + 2;
+            case {'Verbose', 'verbose'}
+                if length(varargin)>index && islogical(varargin{index+1})
+                    verbose = varargin{index+1};
+                    index = index + 2;
+                else
+                    verbose = ~verbose;
+                    index = index + 1;
+                end
             case 'frameRate'
                 frameRate = varargin{index+1};
+                index = index + 2;
+            case 'DatasetName'
+                DatasetName = varargin{index+1};
+                index = index + 2;
+            case 'Channel'
+                Channel = varargin{index+1};
+                index = index + 2;
+            case 'ChunkSize'
+                ChunkSize = varargin{index+1};
                 index = index + 2;
             otherwise
                 warning('Argument ''%s'' not recognized',varargin{index});
@@ -170,19 +195,24 @@ end
 
 
 %% Save images to file
-
-% Determine file type
-[~,~,ext] = fileparts(Filename);
+if Append && ~exist(Filename,'file')
+    warning('Append set to true, but previous file doesn''t exist. Writing new file...');
+    Append = false;
+end
 
 % Save images
-if Append
-    fprintf('Appending\t%d\tframes to file:\t%s...', numFrames, Filename);
-else
-    fprintf('Writing\t%d\tframes to file:\t%s...', numFrames, Filename);
+[~,~,ext] = fileparts(Filename); % determine file type
+if verbose
+    if Append
+        fprintf('Appending %7.d frame(s) to:   %s...', numFrames, Filename);
+    else
+        fprintf('Writing   %7.d frame(s) to:   %s...', numFrames, Filename);
+    end
+    t=tic;
 end
 switch ext
     
-    case '.tif'
+    case {'.tif','.tiff'}
         
         % Ensure data works with TiffLib
         if isa(Images,'single')
@@ -230,7 +260,7 @@ switch ext
         if Append
             tiffObject = Tiff(Filename,'a');
         else
-            tiffObject = Tiff(Filename,'w');
+            tiffObject = Tiff(Filename,'w8');
         end
                 
         % Write frames to file
@@ -278,16 +308,40 @@ switch ext
         end
         close(vidObj);                                      % close file
     
-%     case 'hdf5'
-%         
-%         sizY = [Y,X,F];
-%         bin_width = round(512*512/prod(sizY)*4e3);
-%         nd = length(sizY)-1;
-%         sizY = sizY(1:nd);
-%         h5create(output_filename,'/mov',[sizY,Inf],'Chunksize',[sizY,bin_width],'Datatype',data_type);
-%         for t = 1:bin_width:T
-%         h5write(output_filename,'/mov',Ytm,[ones(1,nd),t],[sizY(1:nd),size(Ytm,3)]);
-%         end
+    case {'.hdf5','.h5'}
+        
+        % Keep only specified Channel
+        if ~isempty(Channel)
+            Images = Images(:,:,Channel,:); % keep specified channel
+            if numel(Channel)==1
+                Images = permute(Images,[1,2,4,3]); % remove channel dimension
+                if numel(ChunkSize)>3
+                    ChunkSize = ChunkSize([1,2,4]);
+                end
+            end
+        end
+        Dim = size(Images); % determine image dimenions
+        nDims = numel(Dim); % determine # of dimensions
+            
+        % Save images to file
+        if Append
+            info = h5info(Filename);
+            ind = ismember({info.Datasets(:).Name},DatasetName);
+            if nDims ~= numel(info.Datasets(ind).Dataspace.Size)
+                error('Dataset %s in hdf5 file and images input do not have the same dimensions!',DatasetName);
+            end
+            if any(info.Datasets(ind).Dataspace.Size+Dim > info.Datasets(ind).Dataspace.MaxSize)
+                error('Not enough room exists in current hdf5 file!');
+            end
+            start = info.Datasets(ind).Dataspace.Size(end) + 1;
+            h5write(Filename,['/',DatasetName],Images,[ones(1,nDims-1),start],Dim);
+        else
+            if isempty(ChunkSize)
+                ChunkSize = [Dim(1:2),ones(1,nDims-2)]; % set chunk size for each dimension
+            end
+            h5create(Filename,['/',DatasetName],[Dim(1:end-1),inf],'ChunkSize',ChunkSize); % 'inf' in frame dimension allows for appending more frames later (ChunkSize must be specified to allow this)
+            h5write(Filename,['/',DatasetName],Images,ones(1,nDims),Dim);
+        end
         
     otherwise % assumes binary file
         
@@ -317,5 +371,17 @@ switch ext
         
 end %switch ext
 
-fprintf('\tComplete\n');
+if verbose
+    t=toc(t);
+    if t<60
+        s = 'seconds';
+    elseif t<3600
+        t = t/60;
+        s = 'minutes';
+    else
+        t = t/3600;
+        s = 'hours -> probably overloading RAM and using swap space, it''s recommended to load less frames at a time';
+    end
+    fprintf('\tComplete (%.2f %s)\n',t,s);
+end
 
