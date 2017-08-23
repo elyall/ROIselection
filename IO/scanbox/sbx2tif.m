@@ -100,6 +100,15 @@ for bindex = 1:numFramesPerLoad:numFrames % direct loading only -> load frames i
         Images = applyMotionCorrection(Images, MCdata, loadObj);
     end
     
+    % Re-interleave depths
+    [H,W,numZ,numC,N] = size(Images);
+    Images = permute(Images,[1,2,4,3,5]);
+    Images = reshape(Images,H,W,numC,numZ*N);
+    if lastframe==numFrames % remove all NaN frames
+        N = numZ*N-numel(currentFrames);
+        Images(:,:,:,end-N+1:end) = [];
+    end
+    
     % Save to file
     if bindex==1
         save2P(TifFile,Images,'verbose');
