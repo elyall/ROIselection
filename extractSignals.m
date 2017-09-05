@@ -159,6 +159,16 @@ if saveOut && isempty(saveFile)
     warning('Cannot save output as no file specified');
     saveOut = false;
 end
+if ~isfield(ROIdata,'Config')
+    warning('ROIdata does not have image ''Config'' struct attached; assuming numDepths=1 & frameRate=15.49.');
+    ROIdata.Config.Depth = 1;
+    ROIdata.Config.FrameRate = 15.49;
+    ROIdata.depth = 1;
+end
+if Depth~=ROIdata.depth
+    warning('Changing Depth from %d to %d to match ROIdata.depth.',Depth,ROIdata.depth);
+    Depth = ROIdata.depth;
+end
 
 % Images
 if iscellstr(Images) % filename input
