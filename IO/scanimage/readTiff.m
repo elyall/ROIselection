@@ -1,11 +1,11 @@
 function Images = readTiff(TifFile, varargin)
-% Loads 'Frames' of single .sbx file ('SbxFile'). Requires
-% corresponding information file ('InfoFile').
+% Loads 'Frames' of single .tif file ('TifFile')
 
 Frames = [1,inf]; % indices of frames to load in 'Direct' mode, or 'all'
+AutoScale = false;
 % Channel = 1;
 % Depths = 1;
-Verbose = true;
+Verbose = false;
 
 warning('off','MATLAB:imagesci:tiffmexutils:libtiffWarning');
 
@@ -16,6 +16,9 @@ while index<=length(varargin)
         switch varargin{index}
             case {'Frames','frames'} % indices of frames to load in 'Direct' mode
                 Frames = varargin{index+1};
+                index = index + 2;
+            case {'AutoScale','Scale'}
+                AutoScale = varargin{index+1};
                 index = index + 2;
 %             case {'Depths', 'depths'}
 %                 Depths = varargin{index+1};
@@ -60,34 +63,56 @@ end
 numFrames = numel(Frames);
 
 
+%% Determine data type
+Class = 'double';
+switch info(1).SampleFormat
+    case 'Unsigned integer'
+        if info(1).BitDepth==8
+            Class = 'uint8';
+        elseif info(1).BitDepth==16
+            Class = 'uint16';
+        elseif info(1).BitDepth==32
+            Class = 'uint32';
+        end
+end
+    
+
 %% Load in frames
 if Verbose
     fprintf('Loading\t%d\tframe(s) from\t%s...', numFrames, TifFile);
-    parfor_progress(numFrames);
+    Fn=parfor_progress(numFrames);
 end
 
+% Initialize output
 switch info(1).ColorType
     case 'truecolor'
-        Images = zeros(info(1).Height, info(1).Width, 3, numFrames);
+        Images = zeros(info(1).Height, info(1).Width, 3, numFrames, Class);
     otherwise
-        Images = zeros(info(1).Height, info(1).Width, 1, numFrames);
+        Images = zeros(info(1).Height, info(1).Width, 1, numFrames, Class);
 end
+
+% Read in file
 tif=Tiff(TifFile,'r');
 findex = 1;
-while findex < numFrames
+while findex <= numFrames
     if tif.currentDirectory ~= Frames(findex)
         tif.nextDirectory
     else
         Images(:,:,:,findex)=tif.read();
         findex=findex+1;
         if Verbose
-            parfor_progress;
+            parfor_progress(Fn);
         end
     end
 end
 tif.close;
 
 if Verbose
-    parfor_progress(0);
+    parfor_progress(Fn,0);
 end
 
+if AutoScale
+    Images = double(Images);
+    Images = Images*double(intmax(Class))/max(Images(:));
+    Images = cast(Images,Class);
+end
