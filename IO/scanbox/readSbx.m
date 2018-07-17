@@ -47,6 +47,7 @@ Frames = 1:20;          % indices of frames to load in 'Direct' mode
 IndexType = 'absolute'; % 'absolute' or 'relative' -> specifies whether 'Frames' indexes the absolute frame index or the relative frame index for the depth(s) requested (doesn't matter if only 1 depth in the file)
 Channels = 1;           % default channels to load
 Depths = inf;           % default depths to load
+FramesPerDepth = 1;     % specifies number of frames taken at given depth before moving on to next depth
 verbose = true;         % booleon determining whether to display progress bar
 invert = false;         % invert colormap boolean
 flipLR = false;         % flip images across vertical axis
@@ -79,6 +80,9 @@ while index<=length(varargin)
                 index = index + 2;
             case {'Depths', 'depths', 'Depth', 'depth'}
                 Depths = varargin{index+1};
+                index = index + 2;
+            case 'FramesPerDepth'
+                FramesPerDepth = varargin{index+1};
                 index = index + 2;
             case {'Invert', 'invert'}
                 invert = ~invert;
@@ -277,7 +281,7 @@ switch LoadType
             
             % Reshape if multiple depths are being loaded
             if organizeDepths && Config.Depth > 1 && numDepths > 1
-                Images = depthShape(Images,Frames,depthID');
+                Images = depthShape(Images,Frames,depthID','FramesPerDepth',FramesPerDepth);
             end
             
         else

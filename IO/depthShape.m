@@ -33,10 +33,18 @@ while index<=length(varargin)
     end
 end
 
+% For sampling multiple frames at each depth -> reorder so that depths are
+% interleaved every frame (simplifies reordering)
+if numel(FramesPerDepth)>1 && numel(unique(FramesPerDepth))==1 && FramesPerDepth(1)>1
+    order = depthID';
+    order = order(:);
+    Images = Images(:,:,:,:,order);
+    FramesPerDepth = 1;
+end
 
 %% De-interleave different depths
 Dim = size(Images);
-if FramesPerDepth==1 % section is continuous -> simple reshape 
+if all(FramesPerDepth==1) % section is continuous -> simple reshape 
     F = find(isnan(depthID'));  % locate nonexistent frames
     for ii = 1:numel(F)         % add in blank frames
         if F(ii) == 1

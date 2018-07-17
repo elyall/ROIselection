@@ -225,7 +225,7 @@ switch LoadType
         for index = 1:numFiles
             if  ~isempty(FrameIndex{index})
                 if Config(index).Depth>1
-                    [depthID,relativeIndex] = idDepth(Config(index),[],'IndexType',IndexType,'Frames',FrameIndex{index},'Depths',Depths); % determine file indices of frames requested
+                    [depthID,relativeIndex] = idDepth(Config(index),[],'IndexType',IndexType,'Frames',FrameIndex{index},'Depths',Depths,'FramesPerDepth',Config(index).FramesPerDepth); % determine file indices of frames requested
                     numFrames(index) = numel(relativeIndex);
                     numDepths = sum(any(~isnan(depthID),1));
                     depthID = depthID';
@@ -249,7 +249,7 @@ switch LoadType
                 switch loadObj.files(index).ext
                     case '.sbx'
                         Images(:,:,:,:,startFrame(index):startFrame(index)+numFrames(index)-1)...
-                            = readSbx(ImageFiles{index}, 'Type', 'Direct', 'Frames', FrameIndex{index}, 'IndexType', 'absolute', 'Channels', Channels, 'Depth', Depths, 'Verbose', Verbose);
+                            = readSbx(ImageFiles{index}, 'Type', 'Direct', 'Frames', FrameIndex{index}, 'IndexType', 'absolute', 'Channels', Channels, 'Depth', Depths, 'FramesPerDepth', Config(index).FramesPerDepth, 'Verbose', Verbose);
                     case '.tif'
                         Images(:,:,:,:,startFrame(index):startFrame(index)+numFrames(index)-1)...
                             = readScim(ImageFiles{index}, 'Frames', FrameIndex{index}, 'Channels', Channels, 'Verbose', Verbose);

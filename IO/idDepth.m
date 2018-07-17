@@ -75,7 +75,15 @@ if ischar(totalDepths)
 end
 if isstruct(totalDepths)
     totalFrames = totalDepths.Frames;
+    FramesPerDepth = totalDepths.FramesPerDepth;
     totalDepths = totalDepths.Depth;
+end
+if numel(FramesPerDepth)>1
+    if numel(unique(FramesPerDepth))>1
+        error('doesn''t currently support depths being sampled at different frequencies');
+    else
+        FramesPerDepth = FramesPerDepth(1);
+    end
 end
 
 % In case where there is only one depth, skip the nonsense

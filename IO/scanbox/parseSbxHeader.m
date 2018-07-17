@@ -91,8 +91,10 @@ if ~isfield(info,'otwave') || isempty(info.otwave) || ~info.volscan
     config.Depth = 1;
     config.ZStepSize = 0;
 else
-    config.Depth = numel(info.otwave_um);
+    Depths = unique(info.otwave_um);
+    config.Depth = numel(Depths);
     config.ZStepSize = info.otwave_um;
+    config.FramesPerDepth = arrayfun(@(x) nnz(info.otwave_um==Depths(x)), 1:numel(Depths));
 end
 
 % Determine # of frames
