@@ -153,6 +153,7 @@ if ~isempty(CLim)
         Class = class(Images);
     end
     Images = double(Images);
+    CLim = double(CLim);
     if isequal(CLim,true) % imagesc each frame
         for findex = 1:numFrames
             for cindex = 1:numC
