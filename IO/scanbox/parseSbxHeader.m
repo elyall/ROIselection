@@ -90,6 +90,7 @@ end
 if ~isfield(info,'otwave') || isempty(info.otwave) || ~info.volscan
     config.Depth = 1;
     config.ZStepSize = 0;
+    config.FramesPerDepth = 1;
 else
     Depths = unique(info.otwave_um);
     config.Depth = numel(Depths);
