@@ -22,11 +22,26 @@ config.FullFilename = TifFile;
 %% Identify header information from file
 
 % Load header
-header = scim_openTif(TifFile);
+try
+    header = scim_openTif(TifFile);
+catch
+    temp = imfinfo(TifFile);
+    temp = parseSI5Header(temp(1).Software);
+    header = temp.SI;
+end
 config.header = {header};
 
 % Save important information
-if isfield(header,'scanimage') && header.scanimage.VERSION_MAJOR == 5;
+if isfield(header,'VERSION_MAJOR')
+    config.Height = header.hRoiManager.linesPerFrame;
+    config.Width = header.hRoiManager.pixelsPerLine;
+    config.Depth = header.hStackManager.numSlices;
+    config.ZStepSize = header.hStackManager.stackZStepSize;
+    config.Channels = numel(header.hChannels.channelSave);
+    config.FrameRate = header.hRoiManager.scanFrameRate;
+    config.ZoomFactor = header.hRoiManager.scanZoomFactor;
+    config.Frames = header.hStackManager.framesPerSlice;
+elseif isfield(header,'scanimage') && header.scanimage.VERSION_MAJOR == 5
     config.Height = header.scanimage.linesPerFrame;
     config.Width = header.scanimage.pixelsPerLine;
     config.Depth = header.scanimage.stackNumSlices;
@@ -45,9 +60,10 @@ else
     config.ZoomFactor = header.acq.zoomFactor;
     
     % Determine number of frames
-    info = imfinfo(TifFile);
-    config.Frames = numel(info)/(config.Channels*config.Depth);
+    temp = imfinfo(TifFile);
+    config.Frames = numel(temp)/(config.Channels*config.Depth);
 end
+
 
 %% DEFAULTS
 % config.MotionCorrected = false;

@@ -3,8 +3,6 @@ function Images = readTiff(TifFile, varargin)
 
 Frames = [1,inf]; % indices of frames to load in 'Direct' mode, or 'all'
 AutoScale = false;
-% Channel = 1;
-% Depths = 1;
 Verbose = false;
 
 warning('off','MATLAB:imagesci:tiffmexutils:libtiffWarning');
@@ -20,12 +18,6 @@ while index<=length(varargin)
             case {'AutoScale','Scale'}
                 AutoScale = varargin{index+1};
                 index = index + 2;
-%             case {'Depths', 'depths'}
-%                 Depths = varargin{index+1};
-%                 index = index + 2;
-%             case {'Channel','channel'}
-%                 Channel = varargin{index+1};
-%                 index = index + 2;
             case {'Verbose', 'verbose'}
                 Verbose = varargin{index+1};
                 index = index + 2;

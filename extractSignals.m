@@ -201,6 +201,7 @@ if iscellstr(Images) % filename input
     end
 else % numeric array input
     loadType = false;
+    ImageFiles = {};
     [Height, Width, ~, ~, totalFrames] = size(Images);
     numFramesPerLoad = totalFrames;
 end
@@ -262,6 +263,8 @@ if ischar(MotionCorrect) % load in MCdata structure
 elseif isstruct(MotionCorrect) % MCdata structure input
     MCdata = MotionCorrect;
     MotionCorrect = true;
+else
+    MCdata = [];
 end
 
 
@@ -343,7 +346,12 @@ switch Mode
         parfor findex = FrameIndex
             
             % Load Frame
-            [img, loadObj] = load2P(ImageFiles, 'Type', 'Direct', 'Frames', findex, 'IndexType', 'relative', 'Channel', Channel, 'Depth', Depth, 'double'); %direct
+            if loadType
+                [img, loadObj] = load2P(ImageFiles, 'Type', 'Direct', 'Frames', findex, 'IndexType', 'relative', 'Channel', Channel, 'Depth', Depth, 'double'); %direct
+            else
+                loadObj = []; % FIX LATER
+                img = Images(:,:,Depth,Channel,findex);
+            end
             
             % Remove border pixels
             if borderLims
