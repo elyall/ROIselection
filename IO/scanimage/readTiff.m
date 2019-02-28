@@ -85,16 +85,11 @@ end
 
 % Read in file
 tif=Tiff(TifFile,'r');
-findex = 1;
-while findex <= numFrames
-    if tif.currentDirectory ~= Frames(findex)
-        tif.nextDirectory
-    else
-        Images(:,:,:,findex)=tif.read();
-        findex=findex+1;
-        if Verbose
-            parfor_progress(Fn);
-        end
+for findex = 1:numFrames
+    tif.setDirectory(Frames(findex))
+    Images(:,:,:,findex)=tif.read();
+    if Verbose
+        parfor_progress(Fn);
     end
 end
 tif.close;

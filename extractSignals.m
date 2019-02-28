@@ -42,7 +42,7 @@ function [ROIdata, Data, Neuropil, ROIindex] = extractSignals(Images, ROIdata, R
 %
 
 
-Mode = 'Cell';              % 'GPU', 'Cell', 'Sparse'
+Mode = 'Batch';              % 'GPU', 'Cell', 'Sparse'
 loadType = 'Direct';        % 'MemMap' or 'Direct'
 saveOut = false;            % true or false
 saveFile = '';              % filename to save ROIdata output to (defaults to ROIFile if one is input)
@@ -194,10 +194,10 @@ if iscellstr(Images) % filename input
     end
     Height = loadObj.Height;
     Width = loadObj.Width;
-    if Config.Depth == 1
+    if Config(1).Depth == 1 % assumes all files have the same depth
         totalFrames = sum([loadObj.files(:).Frames]);
     else
-        totalFrames = sum(floor([loadObj.files(:).Frames]/Config.Depth)+(rem([loadObj.files(:).Frames],Config.Depth)>=Depth));
+        totalFrames = sum(floor([loadObj.files(:).Frames]/Config(1).Depth)+(rem([loadObj.files(:).Frames],Config(1).Depth)>=Depth));
     end
 else % numeric array input
     loadType = false;
@@ -277,7 +277,7 @@ Neuropil = nan(numROIs, totalFrames);
 % Cycle through frames computing average fluorescence
 fprintf('Extracting signals for %d ROI(s) from %d frame(s): %s\n', numROIs, numFrames, ROIFile)
 if verbose
-    parfor_progress(numFrames);
+    h = parfor_progress(numFrames);
 end
 tic;
 switch Mode
@@ -318,18 +318,66 @@ switch Mode
             numImages = size(Images, 5);
             Images = double(reshape(Images(:,:,1,1,:), Height*Width, numImages));
             
-            fprintf('Finished frame: ');
+            % Calculate fluorescence signal
             for findex = 1:numImages
-                
-                % Calculate fluorescence signal
                 Data(:,currentFrames(findex)) = gather(nanmean(bsxfun(@times, DataMasks, gpuArray(Images(:,findex))), 1));
                 Neuropil(:,currentFrames(findex)) = gather(nanmean(bsxfun(@times, NeuropilMasks, gpuArray(Images(:,findex))), 1));
-                
                 if verbose
-                    parfor_progress; % Update status
+                    parfor_progress(h); % Update status
                 end
-                
             end %findex
+        end %bindex
+        
+    case 'Batch'
+        
+        % Define masks
+        DataMasks = cell(numROIs, 1);
+        NeuropilMasks = cell(numROIs, 1);
+        for rindex = 1:numROIs
+            DataMasks{rindex} = find(ROIdata.rois(ROIindex(rindex)).mask);
+            NeuropilMasks{rindex} = find(ROIdata.rois(ROIindex(rindex)).neuropilmask);
+        end
+        
+        % Cycle through frames in batches
+        for bindex = 1:numFramesPerLoad:numFrames % direct loading only -> load frames in batches
+            lastframe = min(bindex+numFramesPerLoad-1, numFrames);
+            currentFrames = FrameIndex(bindex:lastframe);
+            
+            % direct loading only -> load current batch
+            if strcmp(loadType, 'Direct')
+                if bindex ~= 1
+                    fprintf('\n');
+                end
+                [Images, loadObj] = load2P(ImageFiles, 'Type', 'Direct', 'Frames', currentFrames, 'IndexType', 'relative', 'Channel', Channel, 'Depth', Depth, 'double');
+            end
+            
+            % Remove border pixels
+            if borderLims
+                Images = bsxfun(@times, Images, Border);
+            end
+            
+            % Correct for motion
+            if MotionCorrect
+                fprintf('\b\tCorrecting motion...');
+                Images = applyMotionCorrection(Images, MCdata, loadObj);
+                fprintf('\tComplete\n');
+            end
+                        
+            % Calculate fluorescence signal
+            numImages = size(Images, 5);
+            parfor rindex = 1:numROIs
+                inds = DataMasks{rindex} + Height*Width*(0:numImages-1); % indices of ROI in all frames
+                Data(rindex,currentFrames) = nanmean(reshape(Images(inds(:)),[numel(DataMasks{rindex}),numImages]));
+                inds = NeuropilMasks{rindex} + Height*Width*(0:numImages-1);
+                Neuropil(rindex,currentFrames) = nanmean(reshape(Images(inds(:)),[numel(NeuropilMasks{rindex}),numImages]));
+            end %rindex
+
+%             if verbose
+%                 parfor f = 1:numImages
+%                     parfor_progress(h); % update status
+%                 end
+%             end
+            
         end %bindex
         
     case 'Cell'
@@ -346,12 +394,12 @@ switch Mode
         parfor findex = FrameIndex
             
             % Load Frame
-            if loadType
+%             if loadType % fails to properly avoid else in parfor loop
                 [img, loadObj] = load2P(ImageFiles, 'Type', 'Direct', 'Frames', findex, 'IndexType', 'relative', 'Channel', Channel, 'Depth', Depth, 'double'); %direct
-            else
-                loadObj = []; % FIX LATER
-                img = Images(:,:,Depth,Channel,findex);
-            end
+%             else
+%                 loadObj = []; % FIX LATER
+%                 img = Images(:,:,Depth,Channel,findex);
+%             end
             
             % Remove border pixels
             if borderLims
@@ -371,7 +419,7 @@ switch Mode
             end
             
             if verbose
-                parfor_progress; % Update status
+                parfor_progress(h); % Update status
             end
             
         end %findex
@@ -411,21 +459,21 @@ switch Mode
             Neuropil(:,findex) = full(nansum(bsxfun(@times, DataMasks, img)))./numPixelsNeuropil;
             
             if verbose
-                parfor_progress; % Update status
+                parfor_progress(h); % Update status
             end
             
         end
         
 end %Mode
 if verbose
-    parfor_progress(0);
+    parfor_progress(h,0);
 end
 fprintf('\tComplete.\tSession took: %.1f minutes\n', toc/60)
 
 
 %% Distribute data to structure
 for rindex = 1:numROIs
-    if ~isfield(ROIdata.rois(1),'rawdata');
+    if ~isfield(ROIdata.rois(1),'rawdata')
         ROIdata.rois(1).rawdata = [];
     end
     if isempty(ROIdata.rois(ROIindex(rindex)).rawdata) % replace whole vector

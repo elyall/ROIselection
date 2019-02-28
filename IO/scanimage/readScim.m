@@ -36,7 +36,7 @@ while index<=length(varargin)
 end
 
 if ~exist('TifFile', 'var') || isempty(TifFile)
-    [TifFile,p] = uigetfile({'*.sbx'}, 'Choose scanbox file to load');
+    [TifFile,p] = uigetfile({'*.tif'}, 'Choose scanimage file to load');
     if isnumeric(TifFile)
         Images = []; return
     end
