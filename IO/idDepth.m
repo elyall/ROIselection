@@ -75,7 +75,7 @@ if ischar(totalDepths)
 end
 if isstruct(totalDepths)
     totalFrames = totalDepths.Frames;
-    FramesPerDepth = totalDepths.FramesPerDepth;
+%     FramesPerDepth = totalDepths.FramesPerDepth;
     totalDepths = totalDepths.Depth;
 end
 if numel(FramesPerDepth)>1
